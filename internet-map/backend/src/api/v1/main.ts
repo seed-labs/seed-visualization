@@ -7,12 +7,17 @@ import {SubmitEvent} from '../../utils/submit-event';
 import {PluginManager} from '../../utils/plugin-manager';
 import WebSocket from 'ws';
 import {Controller} from '../../utils/controller';
+import satelliteRouter from './satellite/index';
 
+let snifferSubscribers: WebSocket[] = [];
+let currentSnifferFilter: string = '';
+let visSubscribers: WebSocket[] = [];
+let hostSubscribers: WebSocket[] = [];
+let packetSubscribers: WebSocket[] = [];
 const wsDataType = {
     SNIFF_PACKET: "SNIFF_PACKET",
     CAPTURE_PACKET: "CAPTURE_PACKET"
 }
-
 const router = express.Router();
 const docker = new dockerode();
 const socketHandler = new SocketHandler(docker);
@@ -38,19 +43,15 @@ const getContainers: () => Promise<SeedContainerInfo[]> = async function () {
     // filter out undefine (not our nodes)
     return _containers.filter(c => c.meta.emulatorInfo.name);
 }
-
 socketHandler.getLoggers().forEach(logger => logger.setSettings({
     minLevel: 'warn'
 }));
-
 sniffer.getLoggers().forEach(logger => logger.setSettings({
     minLevel: 'warn'
 }));
-
 controller.getLoggers().forEach(logger => logger.setSettings({
     minLevel: 'warn'
 }));
-
 router.get('/env.js', (req, res, next) => {
     const envVarsForFrontend = {
         CONSOLE: process.env.CONSOLE,
@@ -60,7 +61,6 @@ router.get('/env.js', (req, res, next) => {
 
     next();
 });
-
 router.get('/network', async function (req, res, next) {
     var networks = await docker.listNetworks();
 
@@ -83,7 +83,6 @@ router.get('/network', async function (req, res, next) {
 
     next();
 });
-
 router.get('/container', async function (req, res, next) {
     try {
         let containers = await getContainers();
@@ -101,14 +100,12 @@ router.get('/container', async function (req, res, next) {
 
     next();
 });
-
 router.get('/install', async function (req, res, next) {
     res.json({
         ok: true,
         result: pluginManager.plugins
     });
 });
-
 router.post('/install', express.json(), async function (req, res, next) {
     const plugin = req.body.name
     const address = `${req.socket.localAddress}:${req.socket.localPort}`
@@ -128,7 +125,6 @@ router.post('/install', express.json(), async function (req, res, next) {
 
     next();
 });
-
 router.post('/uninstall', express.json(), async function (req, res, next) {
     const plugin = req.body.name
     let ret = await submitEvent.submitEvent('', (await getContainers()).map(c => c.Id), 'uninstall', plugin);
@@ -147,7 +143,6 @@ router.post('/uninstall', express.json(), async function (req, res, next) {
 
     next();
 });
-
 router.get('/container/:id', async function (req, res, next) {
     var id = req.params.id;
 
@@ -172,7 +167,6 @@ router.get('/container/:id', async function (req, res, next) {
 
     next();
 });
-
 router.get('/container/:id/net', async function (req, res, next) {
     let id = req.params.id;
 
@@ -197,7 +191,6 @@ router.get('/container/:id/net', async function (req, res, next) {
 
     next();
 });
-
 router.post('/container/:id/net', express.json(), async function (req, res, next) {
     let id = req.params.id;
 
@@ -223,7 +216,6 @@ router.post('/container/:id/net', express.json(), async function (req, res, next
 
     next();
 });
-
 router.post('/container/vis/set', express.json(), async function (req, res, next) {
     // let id = req.params.id;
     let id = req.query.id as string;
@@ -285,7 +277,6 @@ router.post('/container/vis/set', express.json(), async function (req, res, next
 
     next();
 });
-
 router.ws('/console/:id', async function (ws, req, next) {
     try {
         if (process.env.CONSOLE === 'false') {
@@ -301,13 +292,6 @@ router.ws('/console/:id', async function (ws, req, next) {
 
     next();
 });
-
-var snifferSubscribers: WebSocket[] = [];
-var currentSnifferFilter: string = '';
-var visSubscribers: WebSocket[] = [];
-var hostSubscribers: WebSocket[] = [];
-var packetSubscribers: WebSocket[] = [];
-
 router.post('/sniff', express.json(), async function (req, res, next) {
     currentSnifferFilter = req.body.filter ?? '';
     sniffer.setListener((nodeId, data) => {
@@ -341,7 +325,6 @@ router.post('/sniff', express.json(), async function (req, res, next) {
 
     next();
 });
-
 router.get('/sniff', function (req, res, next) {
     res.json({
         ok: true,
@@ -352,22 +335,18 @@ router.get('/sniff', function (req, res, next) {
 
     next();
 });
-
 router.ws('/sniff', async function (ws, req, next) {
     snifferSubscribers.push(ws);
     next();
 });
-
 router.ws('/container/vis/set', async function (ws, req, next) {
     visSubscribers.push(ws);
     next();
 });
-
 router.ws('/host', async function (ws, req, next) {
     hostSubscribers.push(ws);
     next();
 });
-
 router.post('/host', express.json(), async function (req, res, next) {
     let deadSockets: WebSocket[] = [];
 
@@ -390,7 +369,6 @@ router.post('/host', express.json(), async function (req, res, next) {
 
     next()
 })
-
 router.get('/container/:id/bgp', async function (req, res, next) {
     let id = req.params.id;
 
@@ -415,7 +393,6 @@ router.get('/container/:id/bgp', async function (req, res, next) {
 
     next();
 });
-
 router.post('/container/:id/bgp/:peer', express.json(), async function (req, res, next) {
     let id = req.params.id;
     let peer = req.params.peer;
@@ -442,7 +419,6 @@ router.post('/container/:id/bgp/:peer', express.json(), async function (req, res
 
     next();
 });
-
 router.ws('/packet', async function (ws, req, next) {
     packetSubscribers.push(ws);
     next();
@@ -495,4 +471,5 @@ router.post('/packet', express.json(), async function (req, res, next) {
     next();
 });
 
+router.use('/satellite', satelliteRouter);
 export = router;

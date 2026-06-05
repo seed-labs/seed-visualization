@@ -1,0 +1,43 @@
+.starlink-shell {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  color: #edf7ff;
+  background: #03070b;
+}
+
+.overview-panel {
+  position: absolute;
+  z-index: 2;
+  top: 24px;
+  left: 24px;
+  width: 320px;
+  padding: 18px 20px;
+  border: 1px solid rgba(141, 217, 255, 0.18);
+  border-radius: 8px;
+  background: rgba(6, 15, 22, 0.72);
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.32);
+  backdrop-filter: blur(18px);
+
+  h1 {
+    margin: 0;
+    color: #ffffff;
+    font-size: 24px;
+    line-height: 1.18;
+  }
+
+  p {
+    margin: 10px 0 0;
+    color: #a8c2d2;
+    font-size: 13px;
+  }
+}
+
+.panel-kicker {
+  display: block;
+  margin-bottom: 8px;
+  color: #30d5c8;
+  font-size: 12px;
+  font-weight: 700;
+}

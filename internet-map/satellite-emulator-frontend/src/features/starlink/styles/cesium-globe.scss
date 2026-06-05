@@ -1,0 +1,21 @@
+.globe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+
+  :deep(.cesium-viewer),
+  :deep(.cesium-widget),
+  :deep(canvas) {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+  }
+
+  :deep(.cesium-viewer-bottom),
+  :deep(.cesium-credit-logoContainer),
+  :deep(.cesium-credit-textContainer) {
+    display: none !important;
+  }
+}

@@ -24,6 +24,8 @@ export interface SeedEmulatorNet extends VertexMeta {
     scope?: string;
     type?: string;
     prefix?: string;
+    longitude?: string;
+    latitude?: string;
 }
 
 export interface SeedEmulatorMetadata {
@@ -61,8 +63,8 @@ export class Emulator {
 
         Object.keys(labels).forEach(label => {
             if (!label.startsWith(META_PREFIX)) return;
-            var key = label.replace(META_PREFIX, '');
-            var value = labels[label];
+            const key = label.replace(META_PREFIX, '');
+            const value = labels[label];
 
             if (key === 'asn') node.asn = Number.parseInt(value);
             if (key === 'nodename') node.name = value;
@@ -91,12 +93,12 @@ export class Emulator {
     static ParseNetMeta(labels: {
         [key: string]: string
     }): SeedEmulatorNet {
-        var net: SeedEmulatorNet = {};
+        const net: SeedEmulatorNet = {};
 
         Object.keys(labels).forEach(label => {
             if (!label.startsWith(META_PREFIX)) return;
-            var key = label.replace(META_PREFIX, '');
-            var value = labels[label];
+            const key = label.replace(META_PREFIX, '');
+            const value = labels[label];
 
             if (key === 'type') net.type = value;
             if (key === 'scope') net.scope = value;
@@ -104,7 +106,9 @@ export class Emulator {
             if (key === 'prefix') net.prefix = value;
             if (key === 'displayname') net.displayname = value;
             if (key === 'description') net.description = value;
-        });        
+            if (key === 'longitude') net.longitude = value;
+            if (key === 'latitude') net.latitude = value;
+        });
 
         return net;
     }

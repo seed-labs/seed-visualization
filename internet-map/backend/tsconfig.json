@@ -6,9 +6,10 @@
     "preserveConstEnums": true,
     "esModuleInterop": true,
     "sourceMap": true,
+    "skipLibCheck": true,
     "types": ["node"],
     "outDir": "bin/",
-    "lib": ["ES2015", "DOM"]
+    "lib": ["ES2015", "DOM", "ESNext.Disposable"]
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules"]

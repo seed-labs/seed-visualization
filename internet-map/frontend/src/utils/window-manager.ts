@@ -10,20 +10,20 @@ export class Window {
     private _id: string;
     private _title: string;
     private _statusText: string;
-    private _element: HTMLDivElement;
-    private _titleElement: HTMLSpanElement;
+    private _element!: HTMLDivElement;
+    private _titleElement!: HTMLSpanElement;
     private _frameElement: HTMLIFrameElement;
     private _manager: WindowManager;
-    private _maskElement: HTMLDivElement;
-    private _titleBarElement: HTMLDivElement;
-    private _contentElement: HTMLDivElement;
-    private _x: number;
-    private _y: number;
-    private _dx: number;
-    private _dy: number;
+    private _maskElement!: HTMLDivElement;
+    private _titleBarElement!: HTMLDivElement;
+    private _contentElement!: HTMLDivElement;
+    private _x!: number;
+    private _y!: number;
+    private _dx!: number;
+    private _dy!: number;
     private _dragging: boolean;
     private _inSynth: boolean;
-    private _synthControlElement: HTMLElement;
+    private _synthControlElement!: HTMLElement;
     private _isResizing: boolean = false;
     private _resizeDirection: string | null = null;
 
@@ -35,9 +35,9 @@ export class Window {
     private _isFocused: boolean = false;
 
     // Event handlers
-    private _mousedownHandler: (e: MouseEvent) => void;
-    private _mouseupHandler: (e: MouseEvent) => void;
-    private _mousemoveHandler: (e: MouseEvent) => void;
+    private _mousedownHandler!: (e: MouseEvent) => void;
+    private _mouseupHandler!: (e: MouseEvent) => void;
+    private _mousemoveHandler!: (e: MouseEvent) => void;
 
     constructor(manager: WindowManager, id: string, title: string, url: string, top: number, left: number) {
         this._manager = manager;
@@ -57,6 +57,8 @@ export class Window {
         this._frameElement = this._createIframe(url);
 
         this._createWindowElement();
+        void this._contentElement;
+        void this._resizeDirection;
         this._setupEventListeners();
     }
 
@@ -358,11 +360,11 @@ export class Window {
             try {
                 const contentDocument = this._frameElement.contentDocument;
                 if (contentDocument) {
-                    contentDocument.addEventListener('click', (e) => {
+                    contentDocument.addEventListener('click', () => {
                         this._manager.setActiveWindowDirect(this);
                     });
 
-                    contentDocument.addEventListener('mousedown', (e) => {
+                    contentDocument.addEventListener('mousedown', () => {
                         this._manager.setActiveWindowDirect(this);
                     });
                 }
@@ -501,7 +503,7 @@ export class Window {
         this._y = e.clientY;
     }
 
-    private _handleDragEnd(e: MouseEvent): void {
+    private _handleDragEnd(_e: MouseEvent): void {
         if (!this._dragging) return;
 
         this._manager.unblockWindows();
@@ -666,11 +668,12 @@ export class WindowManager {
     private _zindex: number = 10000;
     private _nextOffset: number = 0;
     private _activeWindowId: string = '';
-    private _taskBarChangeEventHandler: (shown: boolean) => void;
+    private _taskBarChangeEventHandler: (shown: boolean) => void = () => {};
 
     constructor(desktopElement: string, taskbarElement: string) {
         this._desktop = document.getElementById(desktopElement) as HTMLDivElement;
         this._taskbar = document.getElementById(taskbarElement) as HTMLDivElement;
+        void this._zindex;
 
         if (this._desktop) {
             // this._desktop.style.position = 'relative';
@@ -814,6 +817,9 @@ export class WindowManager {
 
         windowIds.forEach(id => {
             const win = this._windows[id];
+            if (!win) {
+                return;
+            }
             const item = document.createElement('button');
             const text = document.createElement('span');
 

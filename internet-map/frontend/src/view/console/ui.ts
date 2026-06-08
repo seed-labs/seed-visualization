@@ -21,7 +21,7 @@ export class ConsoleUi {
     private _fit: FitAddon;
 
     /** websocket to console. */
-    private _socket: WebSocket;
+    private _socket!: WebSocket;
 
     /** true if attached to a container. */
     private _attached: boolean;
@@ -78,9 +78,10 @@ export class ConsoleUi {
         infoPanel.appendChild(titleElement);
         infoPanel.appendChild(itemsElement);
 
-        term.element.appendChild(infoPanel);
+        term.element?.appendChild(infoPanel);
 
         this._infoPanel = infoPanel;
+        void this._infoPanel;
 
         this._attached = false;
 
@@ -196,7 +197,7 @@ export class ConsoleUi {
             });
 
             hammer.get('tap').set({taps: 2});
-            hammer.on('tap', (e) => {
+            hammer.on('tap', () => {
                 if (socket.readyState != 1) return;
                 socket.send('\x1b[A');
             });
@@ -268,12 +269,12 @@ export class ConsoleUi {
             }));
         });
 
-        document.addEventListener('console', (e: CustomEvent<ConsoleEvent>) => {
-            let ce: ConsoleEvent = e.detail;
+        document.addEventListener('console', ((e: Event) => {
+            let ce: ConsoleEvent = (e as CustomEvent<ConsoleEvent>).detail;
             if (ce.id != this._id) return;
             if (this._socket.readyState != 1) return;
             this._socket.send(ce.data);
-        });
+        }) as EventListener);
 
         this._terminal.onData((data) => {
             parent.dispatchEvent(new CustomEvent<ConsoleEvent>('console', {

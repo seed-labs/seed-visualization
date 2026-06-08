@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { RefreshRight, Setting } from '@element-plus/icons-vue'
-import UploadMap3DGlobe from '@/view/map/uploadMap/components/UploadMap3DGlobe.vue'
+import UploadMap3DGlobe from '@/components/UploadMap3DGlobe/index.vue'
 import { useIxMap3DUi } from './ui'
 
 const {

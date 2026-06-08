@@ -1,4 +1,5 @@
 import {DataSource} from './datasource.ts';
+import type {VisData} from '@/utils/types.ts';
 import {MapUi as BaseMapUi} from "@/utils/map-ui.ts";
 import type {MapUiConfiguration} from "@/utils/map-ui.ts";
 import {type Edge, type Vertex} from '@/utils/map-datasource.ts';
@@ -74,8 +75,8 @@ export function filterGraphByIXData(nodes: Vertex[], edges: Edge[], selectedStar
                         directlyConnectedStars.add(neighborId);
                         const fullPath = [...path, neighborId];
                         for (let i = 0; i < fullPath.length - 1; i++) {
-                            const currentId = fullPath[i];
-                            const nextId = fullPath[i + 1];
+                            const currentId = fullPath[i]!;
+                            const nextId = fullPath[i + 1]!;
                             edgesToKeep.add(edgeKey(currentId, nextId));
                         }
                         fullPath.forEach(id => nodesToKeep.add(id));
@@ -200,8 +201,8 @@ export class MapUi extends BaseMapUi {
         this._datasource = config.datasource as DataSource;
     }
 
-    setVisData(data) {
-        this._datasource.setVisData(data)
+    setVisData(data: VisData) {
+        ;(this._datasource as any).setVisData(data)
     }
 
     getIxs() {
@@ -216,7 +217,7 @@ export class MapUi extends BaseMapUi {
         return edgeKey(from, to);
     }
 
-    setGraphEdgeEvent(tooltipContent, tooltipVisible, position) {
+    setGraphEdgeEvent(tooltipContent: { value: string }, tooltipVisible: { value: boolean }, position: { value: { x: number; y: number } }) {
         const intervalHandle = setInterval(() => {
             if (!this._graph) {
                 return

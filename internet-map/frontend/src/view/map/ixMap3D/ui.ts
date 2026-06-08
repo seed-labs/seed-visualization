@@ -169,7 +169,7 @@ export function useIxMap3DUi() {
         to: sourceToNodeId.get(edge.toSourceId),
         label: edge.label,
       }))
-      .filter((edge): edge is { from: string; to: string; label?: string } => Boolean(edge.from && edge.to))
+      .filter((edge): edge is { from: string; to: string; label: string | undefined } => Boolean(edge.from && edge.to))
 
     const edges = [...baseGraph.edges]
     const addedEdges = new Set(edges.map((edge) => edgeKey(edge.from, edge.to)))

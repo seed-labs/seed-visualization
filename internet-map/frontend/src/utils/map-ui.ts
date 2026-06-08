@@ -5,7 +5,7 @@ import type {Ref} from "vue"
 import {bpfCompletionTree} from './bpf';
 import {Completion} from './completion';
 import type {EmulatorNetwork, EmulatorNode} from './types';
-import {WindowManager, Window} from './window-manager';
+import {WindowManager} from './window-manager';
 import {DataSource, type NodesType, type EdgesType, type Vertex, META_CLASS, type Edge} from './map-datasource';
 import {DataSource as IXDataSource} from "@/view/map/ixMap/datasource.ts";
 import {DataSource as TransitDataSource} from "@/view/map/transitMap/datasource.ts";
@@ -107,7 +107,7 @@ export class MapUi {
     protected _datasource: DataSource;
 
     private _filterInputValue: Ref<string>;
-    protected allLoadingInstance: LoadingInstance;
+    protected allLoadingInstance!: LoadingInstance;
 
     private _logPanel: HTMLElement;
     private _logView: HTMLElement;
@@ -136,9 +136,9 @@ export class MapUi {
 
     private _clickTimer: number | null;
 
-    protected _nodes: NodesType;
-    protected _edges: EdgesType;
-    protected _graph: Network;
+    protected _nodes!: NodesType;
+    protected _edges!: EdgesType;
+    protected _graph!: Network;
 
     private detailsDialogVisible: Ref<boolean>
     private vertexDetails: Ref<Details[]>
@@ -177,7 +177,7 @@ export class MapUi {
     private _bpfCompletion: Completion;
 
     /** current (or last selected, if none is selected now) vertex. */
-    private _curretNode: Vertex;
+    private _curretNode!: Vertex;
 
     /** current suggestion item selection. */
     private _suggestionsSelection: number;
@@ -259,6 +259,11 @@ export class MapUi {
 
         this._logQueue = [];
         this._logPrinter = this._flasher = 0
+        this._ignoreKeyUp = false
+        this._settingMinimized = false
+        this._replayTask = 0
+        this._replayPos = 0
+        this._firstIntervalStartTime = 0
 
         this._flashQueue = new Set<string>();
         this._flashingNodes = new Set<string>();
@@ -274,6 +279,14 @@ export class MapUi {
 
         this._filterMode = 'filter';
         this._lastSearchTerm = '';
+        void this._lastSearchTerm;
+        void this._ignoreKeyUp;
+        void this._settingMinimized;
+        void this._firstIntervalStartTime;
+        void this._otherConfiguration;
+        void this._findEdgeId2;
+        void this._flashVisNodesRestore;
+        void this._createInfoPlateValuePair;
 
         this._bpfCompletion = new Completion(bpfCompletionTree);
 
@@ -299,7 +312,7 @@ export class MapUi {
             }
         });
 
-        this._datasource.on('dead', (error) => {
+        this._datasource.on('dead', () => {
             let restart = window.confirm('It seems like the backend for seedemu-client has crashed. You should refresh this page to get the connection to the backend re-established.\n\nRefreshing will close all console windows and redraw the map. Use "Ok" to refresh or "cancel" to stay on this page.');
             if (restart) {
                 window.location.reload();
@@ -415,7 +428,7 @@ export class MapUi {
             }
             const _data = JSON.parse(data.data);
             const nodeId = data.source;
-            const node = this._nodes.get(nodeId)
+            const node = this._nodes.get(nodeId) as unknown as Vertex | undefined
             if (!node || node.hidden) {
                 return;
             }
@@ -447,7 +460,7 @@ export class MapUi {
             this._replaySeekBar.disabled = false;
             this._interval.disabled = this._replayStatus === 'playing';
 
-            this._replaySeekBar.max = (this._playlist.length - 1).toString();
+            this._replaySeekBar.max = this._playlist.length - 1;
             // this._replayButton.innerHTML = this._replayStatus === 'playing' ? '<i class="bi bi-pause"></i>' : '<i class="bi bi-play-fill"></i>';
             // this._recordButton.innerHTML = '<i class="bi bi-record-fill"></i>';
         }
@@ -481,6 +494,9 @@ export class MapUi {
                 }
 
                 let [s, ms] = _s.split('.');
+                if (!s || !ms) {
+                    return;
+                }
 
                 let nodes: string[] = [e.source];
                 let added: Set<string> = new Set();
@@ -491,6 +507,9 @@ export class MapUi {
                         added.add(mac);
 
                         let nodeId = this._macMapping[mac];
+                        if (!nodeId) {
+                            return;
+                        }
 
                         if (this._nodes.get(nodeId) === null) {
                             return;
@@ -529,7 +548,7 @@ export class MapUi {
     /**
      * Find all edge ids that meet the from condition
      * **/
-    private _findEdgeIds(fromNode) {
+    private _findEdgeIds(fromNode: string) {
         const allEdges = this._edges.get();
         const edgeIds = new Array<string>();
         allEdges.forEach(edge => {
@@ -541,7 +560,7 @@ export class MapUi {
         return edgeIds ? edgeIds : null;
     }
 
-    private _findEdgeId2(fromNode, toNode) {
+    private _findEdgeId2(fromNode: string, toNode: string) {
         const allEdges = this._edges.get();
         let edgeId = null;
         allEdges.forEach(edge => {
@@ -582,7 +601,7 @@ export class MapUi {
             this._searchHighlightNodes.add(n);
         });
 
-        var updateRequest = [];
+        var updateRequest: any[] = [];
 
         newHighlights.forEach(n => {
             updateRequest.push({
@@ -606,8 +625,8 @@ export class MapUi {
     private _flashVisNodes(
         nodeId: string,
         interval: number = 300,
-        _static: {} = staticDefault,
-        dynamic: {} = dynamicDefault,
+        _static: Record<string, unknown> = staticDefault,
+        dynamic: Record<string, unknown> = dynamicDefault,
         action: string
     ) {
         // during replay, do not flash nodes - they are controlled by the replayer.
@@ -615,9 +634,12 @@ export class MapUi {
             return;
         }
 
-        let shape: string;
+        let shape = 'dot';
         if (this._nodes.get(nodeId)?.type === 'node') {
             const nodeInfo = this._datasource.getNodeInfoById(nodeId);
+            if (!nodeInfo) {
+                return;
+            }
             shape = ['Router', 'BorderRouter'].includes(nodeInfo.meta.emulatorInfo.role) ? 'dot' : 'hexagon';
         }
 
@@ -780,7 +802,7 @@ export class MapUi {
 
             this._suggestionsSelection--;
 
-            children[this._suggestionsSelection + 1].classList.remove('active');
+            children[this._suggestionsSelection + 1]?.classList.remove('active');
         }
 
         if (selection == 'down') {
@@ -793,7 +815,7 @@ export class MapUi {
             this._suggestionsSelection++;
 
             if (this._suggestionsSelection > 0) {
-                children[this._suggestionsSelection - 1].classList.remove('active');
+                children[this._suggestionsSelection - 1]?.classList.remove('active');
             }
         }
 
@@ -937,6 +959,7 @@ export class MapUi {
                         peers.forEach(peer => {
                             const peerStatus = peer.protocolState != 'down' ? peer.bgpState : 'Disabled'
                             const peerAction = peer.protocolState != 'down' ? 'Disable' : 'Enable'
+                            void peerAction
                             // detail3.data[peer.name] = [peerStatus, peerAction]
 
                             let _peerAction = document.createElement('a');
@@ -1004,7 +1027,7 @@ export class MapUi {
 
     private _expandNode(nodeId: string) {
         const children = this._nodes.get({
-            filter: item => item.object.meta.relation.parent.size === 1 && [...item.object.meta.relation.parent][0] === nodeId
+            filter: item => item.object.meta.relation?.parent.size === 1 && [...item.object.meta.relation.parent][0] === nodeId
         });
         if (children.length === 0) {
             return
@@ -1039,13 +1062,16 @@ export class MapUi {
     }
 
     private _getAllDescendants(nodeId: string) {
-        let descendants = [];
+        let descendants: FullItem<Vertex, 'id'>[] = [];
         const stack = [nodeId];
 
         while (stack.length > 0) {
             const currentId = stack.pop();
+            if (!currentId) {
+                continue;
+            }
             const children = this._nodes.get({
-                filter: item => item.object.meta.relation.parent.size === 1 && [...item.object.meta.relation.parent][0] === currentId
+                filter: item => item.object.meta.relation?.parent.size === 1 && [...item.object.meta.relation.parent][0] === currentId
             });
 
             children.forEach(child => {
@@ -1057,7 +1083,7 @@ export class MapUi {
         let other = new Set<string>();
         this._nodes.get().forEach(item => {
             if (!descendants.find(d => d.id === item.id)) {
-                item.object.meta.relation.parent.forEach(i => other.add(i))
+                item.object.meta.relation?.parent.forEach(i => other.add(i))
             }
         })
 
@@ -1078,7 +1104,7 @@ export class MapUi {
             let node = vertex.object as EmulatorNode;
 
             Object.keys(node.NetworkSettings.Networks).forEach(key => {
-                let net = node.NetworkSettings.Networks[key];
+                let net = node.NetworkSettings.Networks[key]!;
                 this._macMapping[net.MacAddress] = net.NetworkID;
                 this._macContainerIDMapping[net.MacAddress] = node.Id;
             });
@@ -1430,7 +1456,7 @@ export class MapUi {
     }
 
     public setBackgroundImg(src: string) {
-        const canvasContainer = this._graph.canvas.body.container
+        const canvasContainer = (this._graph as any).canvas.body.container
         canvasContainer.style.backgroundImage = `url(${src})`
         canvasContainer.style.backgroundSize = 'cover'
         canvasContainer.style.backgroundPosition = 'center'
@@ -1607,7 +1633,10 @@ export class MapUi {
                 this._clickTimer = null;
             }
             const nodeId = ev.nodes[0];
-            const node = this._nodes.get(nodeId);
+            const node = this._nodes.get(nodeId) as unknown as FullItem<Vertex, 'id'> | undefined;
+            if (!node) {
+                return;
+            }
             if (node['collapsed']) {
                 const {vertices, edges} = this._datasource.newVertices(node)
                 vertices.forEach((item: Vertex) => {
@@ -1736,7 +1765,10 @@ export class MapUi {
     };
     updateServiceStyle = (service: string, style: {}) => {
         const children = this._nodes.get({
-            filter: item => META_CLASS in item.object['Labels'] && item.object['Labels'][META_CLASS] !== '' && JSON.parse(item.object['Labels'][META_CLASS]).includes(service)
+            filter: item => {
+                const labels = item.object.Labels ?? {};
+                return META_CLASS in labels && labels[META_CLASS] !== '' && JSON.parse(labels[META_CLASS]).includes(service)
+            }
         });
         if (children.length === 0) {
             return

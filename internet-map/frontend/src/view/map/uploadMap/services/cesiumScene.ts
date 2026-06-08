@@ -395,10 +395,10 @@ function chooseAvoidedPoint(
   placedSegments: RenderSegment[],
   placedPoints: GeoPoint[],
   spreadScale: number,
-) {
+): GeoPoint {
   const localSegments = getLocalSegments(parentPoint, placedSegments)
   const localPoints = getLocalPoints(parentPoint, placedPoints)
-  let bestPoint = candidates[0]
+  let bestPoint = candidates[0]!
   let bestScore = Number.POSITIVE_INFINITY
 
   candidates.forEach((candidate) => {

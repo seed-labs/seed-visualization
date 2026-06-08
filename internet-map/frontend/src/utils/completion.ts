@@ -57,7 +57,7 @@ export class Completion {
         });
 
         if (pointer.children) {
-            return pointer.children.filter(child => child.name.startsWith(lastWord)).map(child => {
+            return pointer.children.filter((child): child is CompletionTree & {name: string; description: string} => Boolean(child.name?.startsWith(lastWord))).map(child => {
                 return {
                     word: child.name,
                     partialword: child.name.slice(lastWord.length),
@@ -70,4 +70,3 @@ export class Completion {
         return [];
     }
 }
-

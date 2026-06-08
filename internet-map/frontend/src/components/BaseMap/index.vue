@@ -261,6 +261,9 @@ const packetWsSet = () => {
       const packetNum = data.data.packetNum ?? -1
       if (packetNum === -1) {
         nodeInfo = mapUi.value?.getNodeInfoById(data.source)?.meta.emulatorInfo
+        if (!nodeInfo) {
+          return
+        }
         style = {
           id: data.source,
           borderWidth: 1,
@@ -354,7 +357,9 @@ onMounted(() => {
         })
       })
     }
-    hostWsSet(mapUi.value)
+    if (mapUi.value) {
+      hostWsSet(mapUi.value)
+    }
     packetWsSet()
 
     window.addEventListener('message', (e) => {

@@ -1,7 +1,6 @@
 import request from '@/utils/request'
-import type {AxiosRequestConfig, AxiosResponse} from "axios";
 
-const headers = {'Content-Type': 'application/json;charset=UTF-8'}
+const requestConfig = {headers: {'Content-Type': 'application/json;charset=UTF-8'}}
 export const URL = {
     INSTALL_URL: '/install',
     UNINSTALL_URL: '/uninstall',
@@ -13,30 +12,30 @@ export interface pluginType{
     entryPoint?: string,
     version?: string,
 }
-export interface ApiRespond<pluginType> {
+export interface ApiRespond<ResultType> {
     ok: boolean;
-    result: pluginType;
+    result: ResultType;
 }
 
-export const reqGetInstallList = (params: {}): Promise<ApiRespond<ResultType>> => {
+export const reqGetInstallList = (params: {}): Promise<ApiRespond<pluginType[]>> => {
     return request.get(
         URL.INSTALL_URL,
         {params}
     )
 }
 
-export const reqUninstall = (data: pluginType): Promise<ApiRespond<ResultType>> => {
+export const reqUninstall = (data: pluginType): Promise<ApiRespond<pluginType>> => {
     return request.post(
         URL.UNINSTALL_URL,
         data,
-        headers
+        requestConfig
     )
 }
 
-export const reqInstall = (data: pluginType): Promise<ApiRespond<ResultType>> => {
+export const reqInstall = (data: pluginType): Promise<ApiRespond<pluginType>> => {
     return request.post(
         URL.INSTALL_URL,
         data,
-        headers
+        requestConfig
     )
 }

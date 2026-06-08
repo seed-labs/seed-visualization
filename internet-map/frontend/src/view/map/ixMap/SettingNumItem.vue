@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {inject, computed} from "vue";
+import {inject, computed, ref} from "vue";
 import type {IXProvider} from "@/types";
 
 const KEY = 'ixNumProvide'
@@ -27,7 +27,7 @@ const onIXNumChange = (newVal: number) => {
 const onIXBlur = () => {
   injected.onIXBlur(ixValue.value)
 }
-const ixValue = ref<string>([])
+const ixValue = ref<string[]>([])
 </script>
 
 <template>

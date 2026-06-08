@@ -23,8 +23,9 @@ export class DataSource extends BaseDataSource {
 
         this._nets.forEach((net: EmulatorNetwork) => {
             net.meta.relation = {parent: new Set<string>()}
-            if (META_CLASS in net['Labels'] && net['Labels'][META_CLASS] !== '') {
-                let services = JSON.parse(net['Labels'][META_CLASS]);
+            const netLabels = net.Labels ?? {};
+            if (META_CLASS in netLabels && netLabels[META_CLASS] !== '') {
+                let services = JSON.parse(netLabels[META_CLASS]);
                 for (const service of services) {
                     if (service.endsWith("Service")) {
                         this.services.add(service);
@@ -34,8 +35,9 @@ export class DataSource extends BaseDataSource {
         })
         this._nodes.forEach((node: EmulatorNode) => {
             node.meta.relation = {parent: new Set<string>()};
-            if (META_CLASS in node['Labels'] && node['Labels'][META_CLASS] !== '') {
-                let services = JSON.parse(node['Labels'][META_CLASS]);
+            const nodeLabels = node.Labels ?? {};
+            if (META_CLASS in nodeLabels && nodeLabels[META_CLASS] !== '') {
+                let services = JSON.parse(nodeLabels[META_CLASS]);
                 for (const service of services) {
                     if (service.endsWith("Service")) {
                         this.services.add(service);
@@ -304,7 +306,7 @@ export class DataSource extends BaseDataSource {
             });
 
             while (stack.length > 0) {
-                const {nodeId, path, dotLabels, lastNodeType} = stack.pop()!;
+                const {nodeId, path, dotLabels} = stack.pop()!;
                 const neighbors = Array.from(adjacencyList.get(nodeId) || []);
 
                 for (const neighbor of neighbors) {
@@ -328,8 +330,8 @@ export class DataSource extends BaseDataSource {
                             processedPaths.add(pathKey);
                             const pathNodes = newPath.filter(id => !dotNodes.has(id));
                             for (let i = 0; i < pathNodes.length - 1; i++) {
-                                const currentNode = pathNodes[i];
-                                const nextNode = pathNodes[i + 1];
+                                const currentNode = pathNodes[i]!;
+                                const nextNode = pathNodes[i + 1]!;
 
                                 const isCurrentStar = starNodeSet.has(currentNode);
                                 const isCurrentDiamond = diamondNodeSet.has(currentNode);
@@ -401,6 +403,7 @@ export class DataSource extends BaseDataSource {
 
             if (neighbors.length === 2) {
                 const [nodeA, nodeB] = neighbors;
+                if (!nodeA || !nodeB) return;
                 if (!removedNodes.has(nodeA) && !removedNodes.has(nodeB)) {
                     const isAStar = starNodeSet.has(nodeA);
                     const isBStar = starNodeSet.has(nodeB);
@@ -499,9 +502,8 @@ export class DataSource extends BaseDataSource {
                     fullLabel: full,
                     dashed: dashed,
                     simplified: true,
-                    // color: {color: color},
-                    color: {color: "#000"},
-                    // width: width,
+                    color: {color},
+                    width,
                     // title: `${newEdge.path.map(id => nodeMap.get(id)?.label).join(' → ')}`
                 });
                 addedEdges.add(edgeKey);

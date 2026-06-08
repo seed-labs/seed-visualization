@@ -5,8 +5,8 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, watch, ref } from 'vue'
 import { ScreenSpaceEventType } from 'cesium'
-import { createUploadMap3DScene, type UploadMap3DSceneApi } from '../services/cesiumScene'
-import type { GlobeGraph, GlobeNode } from '../services/globeGraph'
+import { createUploadMap3DScene, type UploadMap3DSceneApi } from '@/view/map/uploadMap/services/cesiumScene'
+import type { GlobeGraph, GlobeNode } from '@/view/map/uploadMap/services/globeGraph'
 
 const props = defineProps<{
   graph: GlobeGraph
@@ -48,4 +48,4 @@ onBeforeUnmount(() => {
 })
 </script>
 
-<style scoped lang="scss" src="../styles/upload-map-3d-globe.scss"></style>
+<style scoped lang="scss" src="@/view/map/uploadMap/styles/upload-map-3d-globe.scss"></style>

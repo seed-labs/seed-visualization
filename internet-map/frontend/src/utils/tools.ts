@@ -187,7 +187,7 @@ export function genVisData(composeData: ComposeData, projectName = "demo_output"
                 Labels: labels,
                 meta: {
                     emulatorInfo: emulatorInfo,
-                    relation: {parent: {}}
+                    relation: {parent: new Set<string>()}
                 }
             };
 
@@ -365,7 +365,7 @@ export function genVisData(composeData: ComposeData, projectName = "demo_output"
                         name: nodeName,
                         role: labels['org.seedsecuritylabs.seedemu.meta.role'] || ''
                     },
-                    relation: {parent: {}}
+                    relation: {parent: new Set<string>()}
                 }
             };
 
@@ -383,13 +383,7 @@ export function genVisData(composeData: ComposeData, projectName = "demo_output"
     }
 
     const [networks, networkNameToId] = createNetworks(composeData, projectName);
-    let count = 0;
-    for (const [netName, netId] of Object.entries(networkNameToId)) {
-        if (count >= 5) break;
-        // console.log(`  ${netName} -> ${netId.substring(0, 16)}...`);
-        count++;
-    }
-    const [nodes, skippedNodes] = createNodes(composeData, networkNameToId, projectName);
+    const [nodes] = createNodes(composeData, networkNameToId, projectName);
 
     // Build final data
     return {

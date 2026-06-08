@@ -1,5 +1,5 @@
 <script setup lang="ts" xmlns="http://www.w3.org/1999/html">
-import {ref, onMounted, reactive, nextTick, shallowRef, type PropType, type Component, watch} from "vue";
+import {ref, onMounted, reactive, nextTick, shallowRef, type PropType, type Component, watch, onBeforeUnmount} from "vue";
 import type {TabsPaneContext} from 'element-plus'
 import {ElNotification, ElMessage, ElMessageBox} from "element-plus";
 import type {Details} from '@/types'
@@ -59,7 +59,7 @@ interface RuleForm {
 }
 
 const mapData = ref()
-const mapUi = shallowRef<MapUi | IXMapUi | TransitMapUi>()
+const mapUi = shallowRef<any>()
 const serviceColors = ["black", "blue", "green", "red", "yellow", "orange"]
 const inputActiveName = ref('settings')
 const inputFilter = ref('')
@@ -116,8 +116,9 @@ const replayState = reactive({
     value: 200
   }
 })
-const ixOptions = ref([])
-const transitOptions = ref([])
+type SelectOption = { label: string; value: string }
+const ixOptions = ref<SelectOption[]>([])
+const transitOptions = ref<SelectOption[]>([])
 const tooltipVisible = ref(false);
 const tooltipContent = ref('');
 const position = ref({
@@ -270,6 +271,25 @@ const searchInput = () => {
   if (!mapUi.value) return
   mapUi.value?.updateFilterSuggestions(inputSearch.value)
 }
+const closeSuggestions = () => {
+  const suggestions = document.getElementById('filter-suggestions')
+  if (suggestions) {
+    suggestions.innerText = ''
+  }
+}
+const onDocumentPointerDown = (event: PointerEvent) => {
+  const target = event.target as HTMLElement | null
+  if (!target) return
+  if (target.closest('#filter-suggestions') || target.closest('#input-filter') || target.closest('#input-search')) {
+    return
+  }
+  closeSuggestions()
+}
+const onDocumentKeydown = (event: KeyboardEvent) => {
+  if (event.key === 'Escape') {
+    closeSuggestions()
+  }
+}
 const waitForBrowserPaint = () => new Promise<void>((resolve) => {
   requestAnimationFrame(() => setTimeout(resolve, 0))
 })
@@ -313,7 +333,7 @@ watch(() => mapData.value, async (value) => {
   if (!value || !mapUi.value) return
   mapUi.value?.setVisData(value)
   const IXs = mapUi.value?.getIxs() || []
-  ixOptions.value = IXs.map(ix => {
+  ixOptions.value = IXs.map((ix: any) => {
     return {
       label: ix.meta.emulatorInfo.displayname,
       value: ix.meta.emulatorInfo.name,
@@ -321,7 +341,7 @@ watch(() => mapData.value, async (value) => {
   })
   ruleForm.ixNum = IXs.length
   const transits = mapUi.value?.getTransits() || []
-  transitOptions.value = transits.map(transit => {
+  transitOptions.value = transits.map((transit: any) => {
     return {
       label: `AS-${transit.asn} (${transit.info.length})`,
       value: `${transit.asn}`,
@@ -402,6 +422,8 @@ watch(() => mapData.value, async (value) => {
 }, { immediate: false })
 
 onMounted(() => {
+  document.addEventListener('pointerdown', onDocumentPointerDown)
+  document.addEventListener('keydown', onDocumentKeydown)
   nextTick(async () => {
     const datasource = new props.dataSourceClass();
     const config = {
@@ -443,6 +465,10 @@ onMounted(() => {
     }
   })
 })
+onBeforeUnmount(() => {
+  document.removeEventListener('pointerdown', onDocumentPointerDown)
+  document.removeEventListener('keydown', onDocumentKeydown)
+})
 defineExpose({mapUi})
 </script>
 
@@ -454,7 +480,7 @@ defineExpose({mapUi})
         class="tabs input-tabs"
         @tab-click="onTabsClick"
     >
-      <el-tab-pane label="Filter" name="filter">
+      <el-tab-pane label="Filter" name="filter" disabled>
         <el-input
             v-model="inputFilter"
             placeholder="Type a BPF expression to animate packet flows on the map..."
@@ -531,7 +557,7 @@ defineExpose({mapUi})
       draggable
       :modal="false"
       :lock-scroll="false"
-      @close="inputActiveName = 'filter'"
+      @close="inputActiveName = 'search'"
       custom-class="no-overlay-dialog"
   >
     <template #title>

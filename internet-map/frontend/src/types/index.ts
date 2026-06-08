@@ -45,7 +45,9 @@ export interface HoverNodeEvent {
 export interface IXProvider {
     ixNum: Ref<number>,
     ixNumMax: Ref<number>,
+    ixOptions: Ref<{ label: string; value: string }[]>,
     onIXNumChange: (val: number) => void,
+    onIXBlur: (val: string[]) => void,
 }
 
 export interface transitProvider {

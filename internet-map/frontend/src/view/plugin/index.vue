@@ -43,7 +43,7 @@ const onInstall = async (row: pluginType) => {
   try {
     const res = await reqInstall(row)
     if (!res.ok) {
-      throw Error(res.result)
+      throw Error(String(res.result))
     }
   } catch (e) {
     const errMsg = e instanceof Error ? e.message : String(e)

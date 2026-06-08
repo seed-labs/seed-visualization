@@ -16,11 +16,6 @@
         Drop file here or <em>click to upload</em>
       </div>
     </template>
-<!--    <template #tip>-->
-<!--      <div class="el-upload__tip">-->
-<!--        Supported files: docker-compose.yml, docker-compose.yaml, *.json-->
-<!--      </div>-->
-<!--    </template>-->
     <div style="display: flex; justify-content: flex-end; margin-top: 10px;">
       <el-button class="ml-3" type="success" @click="parseFile" :loading="loading">
         {{ loading ? 'During file parsing...' : 'Parse file' }}
@@ -35,8 +30,8 @@
 <script setup lang="ts">
 import {ref} from 'vue'
 import yaml from 'js-yaml'
-import type {UploadInstance, UploadProps, UploadRawFile} from 'element-plus'
-import {ElMessage, genFileId, UploadFile} from 'element-plus'
+import type {UploadFile, UploadInstance, UploadProps, UploadRawFile} from 'element-plus'
+import {ElMessage, genFileId} from 'element-plus'
 import {UploadFilled} from '@element-plus/icons-vue'
 import {genVisData} from "@/utils/tools.ts"
 
@@ -79,7 +74,8 @@ const parseFileContent = (file: File): Promise<any> => {
         const parts = fileName.split('.')
         const suffix = parts[parts.length - 1]!.toLowerCase()
         switch (suffix) {
-          case 'yml' || 'yaml':
+          case 'yml':
+          case 'yaml':
             parsed = yaml.load(content)
             parsed = genVisData(parsed!)
             fileType.value = 'json'

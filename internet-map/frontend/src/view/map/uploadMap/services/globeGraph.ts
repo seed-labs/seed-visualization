@@ -116,7 +116,7 @@ function createFallbackStarCandidates(placedPointCount: number) {
   return candidates
 }
 
-function chooseFallbackStarPoint(placedPoints: GeoPoint[]) {
+function chooseFallbackStarPoint(placedPoints: GeoPoint[]): GeoPoint {
   const candidates = createFallbackStarCandidates(placedPoints.length)
   if (candidates.length === 0) {
     return {
@@ -125,7 +125,7 @@ function chooseFallbackStarPoint(placedPoints: GeoPoint[]) {
     }
   }
 
-  let bestPoint = candidates[0]
+  let bestPoint = candidates[0]!
   let bestScore = -Infinity
   const scoredCandidates = candidates.map((candidate) => {
     let nearestDistance = 180

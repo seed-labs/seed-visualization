@@ -1,5 +1,5 @@
 import type { Edge, Vertex } from '@/utils/map-datasource'
-import type { EmulatorNetwork } from '@/utils/types'
+import type { EmulatorNetwork, EmulatorNode } from '@/utils/types'
 
 export type GlobeNodeKind = 'star' | 'dot' | 'node'
 
@@ -12,6 +12,7 @@ export type GlobeNode = {
   kind: GlobeNodeKind
   parentId?: string
   hasExplicitGeo?: boolean
+  isIxRouter?: boolean
   sourceId?: string
   group?: string
   highlighted?: boolean
@@ -22,6 +23,8 @@ export type GlobeEdge = {
   to: string
   label?: string
   surfaceCurve?: boolean
+  keepLineColor?: boolean
+  internalRouterLink?: boolean
 }
 
 export type GlobeGraph = {
@@ -37,6 +40,8 @@ type GeoPoint = {
 const FALLBACK_MIN_STAR_DISTANCE = 18
 const FALLBACK_RANDOM_ATTEMPTS_MAX = 320
 const FALLBACK_RANDOM_ATTEMPTS_MIN = 72
+const ROUTER_SURFACE_CURVE_MIN_DISTANCE = 0.35
+const INTERNAL_ROUTER_AUTO_RADIUS = 0.95
 
 function normalizeGeoPoint(lat: number, lon: number): GeoPoint | undefined {
   if (!Number.isFinite(lat) || !Number.isFinite(lon)) return undefined
@@ -74,7 +79,12 @@ function tryParseGeoPoint(value: unknown): GeoPoint | undefined {
   return undefined
 }
 
-function getStarGeo(vertex: Vertex): GeoPoint | undefined {
+function getVertexGeo(vertex: Vertex): GeoPoint | undefined {
+  if (vertex.type === 'node') {
+    const node = vertex.object as EmulatorNode
+    return tryParseGeoPoint(node.meta?.emulatorInfo) ?? tryParseGeoPoint(node.meta) ?? tryParseGeoPoint(node)
+  }
+
   const network = vertex.object as EmulatorNetwork
   return tryParseGeoPoint(network.meta?.emulatorInfo) ?? tryParseGeoPoint(network.meta) ?? tryParseGeoPoint(network)
 }
@@ -168,20 +178,51 @@ function buildEdgeLabelByPair(edges: Edge[]) {
   return edgeLabelByPair
 }
 
+function isRouterVertex(vertex?: Vertex) {
+  if (vertex?.type !== 'node') return false
+  const role = (vertex.object as any)?.meta?.emulatorInfo?.role
+  return vertex?.shape === 'dot' && ['Router', 'BorderRouter'].includes(role)
+}
+
+function isLocalNetworkVertex(vertex?: Vertex) {
+  return vertex?.shape === 'diamond'
+}
+
+function getOtherEdgeEnd(edge: Edge, id: string) {
+  return edge.from === id ? edge.to : edge.from
+}
+
+function buildAdjacency(edges: Edge[]) {
+  const adjacency = new Map<string, Edge[]>()
+  edges.forEach((edge) => {
+    if (!adjacency.has(edge.from)) adjacency.set(edge.from, [])
+    if (!adjacency.has(edge.to)) adjacency.set(edge.to, [])
+    adjacency.get(edge.from)?.push(edge)
+    adjacency.get(edge.to)?.push(edge)
+  })
+  return adjacency
+}
+
 export function createGlobeGraph(vertices: Vertex[], edges: Edge[]): GlobeGraph {
   const vertexById = new Map(vertices.map((vertex) => [vertex.id, vertex]))
   const edgeLabelByPair = buildEdgeLabelByPair(edges)
+  const adjacency = buildAdjacency(edges)
   const starVertices = vertices.filter((vertex) => vertex.shape === 'star')
   const starIds = new Set(starVertices.map((vertex) => vertex.id))
+  const routerVertices = vertices.filter(isRouterVertex)
   const directRouteVerticesByStarId = new Map<string, Vertex[]>()
+  const directStarIdsByRouterId = new Map<string, string[]>()
   const starPositions = new Map<string, GeoPoint>()
+  const routerPositions = new Map<string, GeoPoint>()
+  const sourceNodeIdsByRouterId = new Map<string, string[]>()
+  const autoPlacedRouterCountByAnchor = new Map<string, number>()
   const nodes: GlobeNode[] = []
   const globeEdges: GlobeEdge[] = []
   const knownStarPoints: GeoPoint[] = []
   const missingStarVertices: Vertex[] = []
 
   starVertices.forEach((vertex) => {
-    const point = getStarGeo(vertex)
+    const point = getVertexGeo(vertex)
     if (!point) {
       missingStarVertices.push(vertex)
       return
@@ -209,6 +250,10 @@ export function createGlobeGraph(vertices: Vertex[], edges: Edge[]): GlobeGraph 
       directRouteVerticesByStarId.set(starId, [])
     }
     directRouteVerticesByStarId.get(starId)?.push(routeVertex)
+
+    const starIdsForRouter = directStarIdsByRouterId.get(routeVertex.id) ?? []
+    starIdsForRouter.push(starId)
+    directStarIdsByRouterId.set(routeVertex.id, starIdsForRouter)
   })
 
   starVertices.forEach((vertex) => {
@@ -237,7 +282,8 @@ export function createGlobeGraph(vertices: Vertex[], edges: Edge[]): GlobeGraph 
     directRouteVertices.forEach((vertex, index) => {
       const routeNodeId = `${starVertex.id}::${vertex.id}`
       const angle = (Math.PI * 2 * index) / Math.max(directRouteVertices.length, 1)
-      const point = makeOffsetPoint(origin, angle, 0.62)
+      const explicitPoint = getVertexGeo(vertex)
+      const point = explicitPoint ?? makeOffsetPoint(origin, angle, 0.62)
 
       nodes.push({
         id: routeNodeId,
@@ -247,17 +293,99 @@ export function createGlobeGraph(vertices: Vertex[], edges: Edge[]): GlobeGraph 
         height: 130000,
         kind: 'dot',
         parentId: starVertex.id,
+        hasExplicitGeo: Boolean(explicitPoint),
+        isIxRouter: true,
         sourceId: vertex.id,
         group: vertex.group,
       })
+      routerPositions.set(routeNodeId, point)
+
+      const sourceNodeIds = sourceNodeIdsByRouterId.get(vertex.id) ?? []
+      sourceNodeIds.push(routeNodeId)
+      sourceNodeIdsByRouterId.set(vertex.id, sourceNodeIds)
 
       globeEdges.push({
         from: starVertex.id,
         to: routeNodeId,
         label: edgeLabelByPair.get(getEdgeKey(starVertex.id, vertex.id)),
+        surfaceCurve: Boolean(explicitPoint && pointDistance(origin, explicitPoint) >= ROUTER_SURFACE_CURVE_MIN_DISTANCE),
+        keepLineColor: true,
       })
     })
   })
+
+  routerVertices
+    .filter((vertex) => !directStarIdsByRouterId.has(vertex.id))
+    .forEach((vertex, index) => {
+      const explicitPoint = getVertexGeo(vertex)
+      const sameGroupDirectRouters = routerVertices.filter((candidate) => {
+        return directStarIdsByRouterId.has(candidate.id) && String(candidate.group ?? '') === String(vertex.group ?? '')
+      })
+      const anchorRouter = sameGroupDirectRouters[index % Math.max(sameGroupDirectRouters.length, 1)]
+      const anchorNodeId = anchorRouter ? sourceNodeIdsByRouterId.get(anchorRouter.id)?.[0] : undefined
+      const anchorPoint = anchorNodeId ? routerPositions.get(anchorNodeId) : undefined
+      const fallbackStarId = anchorRouter ? directStarIdsByRouterId.get(anchorRouter.id)?.[0] : undefined
+      const fallbackStarPoint = fallbackStarId ? starPositions.get(fallbackStarId) : undefined
+      const origin = anchorPoint ?? fallbackStarPoint ?? placedStarPoints[0] ?? { lat: 0, lon: 0 }
+      const anchorKey = anchorNodeId ?? fallbackStarId ?? 'default'
+      const anchorPlacementIndex = autoPlacedRouterCountByAnchor.get(anchorKey) ?? 0
+      autoPlacedRouterCountByAnchor.set(anchorKey, anchorPlacementIndex + 1)
+      const point = explicitPoint ?? makeOffsetPoint(origin, anchorPlacementIndex * 2.399963229728653, INTERNAL_ROUTER_AUTO_RADIUS)
+
+      nodes.push({
+        id: vertex.id,
+        label: vertex.label,
+        lat: point.lat,
+        lon: point.lon,
+        height: 130000,
+        kind: 'dot',
+        parentId: anchorNodeId ?? fallbackStarId,
+        hasExplicitGeo: Boolean(explicitPoint),
+        isIxRouter: false,
+        sourceId: vertex.id,
+        group: vertex.group,
+      })
+      routerPositions.set(vertex.id, point)
+      sourceNodeIdsByRouterId.set(vertex.id, [vertex.id])
+    })
+
+  vertices
+    .filter(isLocalNetworkVertex)
+    .forEach((networkVertex) => {
+      const routerNeighborIds = (adjacency.get(networkVertex.id) ?? [])
+        .map((edge) => getOtherEdgeEnd(edge, networkVertex.id))
+        .filter((id) => isRouterVertex(vertexById.get(id)))
+
+      for (let leftIndex = 0; leftIndex < routerNeighborIds.length; leftIndex += 1) {
+        for (let rightIndex = leftIndex + 1; rightIndex < routerNeighborIds.length; rightIndex += 1) {
+          const leftSourceId = routerNeighborIds[leftIndex]!
+          const rightSourceId = routerNeighborIds[rightIndex]!
+          const leftNodeIds = sourceNodeIdsByRouterId.get(leftSourceId) ?? []
+          const rightNodeIds = sourceNodeIdsByRouterId.get(rightSourceId) ?? []
+
+          leftNodeIds.forEach((leftNodeId) => {
+            rightNodeIds.forEach((rightNodeId) => {
+              if (leftNodeId === rightNodeId) return
+
+              const leftPoint = routerPositions.get(leftNodeId)
+              const rightPoint = routerPositions.get(rightNodeId)
+
+              globeEdges.push({
+                from: leftNodeId,
+                to: rightNodeId,
+                label: networkVertex.label,
+                surfaceCurve: Boolean(
+                  leftPoint
+                  && rightPoint
+                  && pointDistance(leftPoint, rightPoint) >= ROUTER_SURFACE_CURVE_MIN_DISTANCE,
+                ),
+                internalRouterLink: true,
+              })
+            })
+          })
+        }
+      }
+    })
 
   return { nodes, edges: globeEdges }
 }

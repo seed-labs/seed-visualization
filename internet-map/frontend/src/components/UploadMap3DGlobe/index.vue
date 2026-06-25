@@ -5,13 +5,18 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, watch, ref } from 'vue'
 import { ScreenSpaceEventType } from 'cesium'
-import { createUploadMap3DScene, type UploadMap3DSceneApi } from '@/view/map/uploadMap/services/cesiumScene'
+import {
+  createUploadMap3DScene,
+  type UploadMap3DRenderOptions,
+  type UploadMap3DSceneApi,
+} from '@/view/map/uploadMap/services/cesiumScene'
 import type { GlobeGraph, GlobeNode } from '@/view/map/uploadMap/services/globeGraph'
 
 const props = defineProps<{
   graph: GlobeGraph
   nodeScale?: number
-  showRouterNodes?: boolean
+  showRouterLabels?: boolean
+  expandedRouterParentIds?: string[]
   orientToGraph?: boolean
 }>()
 const emit = defineEmits<{
@@ -24,7 +29,12 @@ let sceneApi: UploadMap3DSceneApi | undefined
 
 function render() {
   const renderedGraph = props.graph
-  sceneApi?.renderGraph(renderedGraph, props.nodeScale, props.showRouterNodes)
+  const options: UploadMap3DRenderOptions = {
+    nodeScale: props.nodeScale,
+    showRouterLabels: props.showRouterLabels,
+    expandedRouterParentIds: props.expandedRouterParentIds,
+  }
+  sceneApi?.renderGraph(renderedGraph, options)
   if (props.orientToGraph && renderedGraph.nodes.length > 0) {
     sceneApi?.orientToGraph(renderedGraph)
   }
@@ -41,7 +51,17 @@ onMounted(() => {
   render()
 })
 
-watch(() => [props.graph, props.nodeScale, props.showRouterNodes, props.orientToGraph], render, { deep: false })
+watch(
+  () => [
+    props.graph,
+    props.nodeScale,
+    props.showRouterLabels,
+    props.expandedRouterParentIds,
+    props.orientToGraph,
+  ],
+  render,
+  { deep: false },
+)
 
 onBeforeUnmount(() => {
   sceneApi?.destroy()

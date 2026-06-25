@@ -31,7 +31,11 @@ export interface EmulatorNode {
             role: string,
             custom?: string,
             description?: string,
-            displayname?: string
+            displayname?: string,
+            latitude?: string,
+            longitude?: string,
+            lat?: number,
+            lon?: number
         };
         relation?: {
             parent: Set<string>,

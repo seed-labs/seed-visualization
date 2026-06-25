@@ -335,7 +335,7 @@ watch(() => mapData.value, async (value) => {
   const IXs = mapUi.value?.getIxs() || []
   ixOptions.value = IXs.map((ix: any) => {
     return {
-      label: ix.meta.emulatorInfo.displayname,
+      label: ix.meta.emulatorInfo.displayname || ix.meta.emulatorInfo.name,
       value: ix.meta.emulatorInfo.name,
     }
   })

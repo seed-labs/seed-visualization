@@ -56,7 +56,7 @@ export class ConsoleNetwork {
      * @returns websocket.
      */
     getSocket(protocol: string = 'ws'): WebSocket {
-        const host = import.meta.env.MODE === 'development' ? import.meta.env.VITE_PROXY_ADDRESS.replace(/^https?:\/\//, '') : location.host
+        const host = import.meta.env.MODE === 'development' ? import.meta.env.VITE_PROXY_EMULATOR_ADDRESS.replace(/^https?:\/\//, '') : location.host
         return new WebSocket(`${protocol}://${host}${import.meta.env.VITE_SERVER_URL_PREFIX}/console/${this._id}`);
     }
 }

@@ -1,34 +1,38 @@
 <script setup lang="ts" xmlns="http://www.w3.org/1999/html">
-import {nextTick, onBeforeUnmount, ref} from 'vue'
+import {computed, nextTick, onBeforeUnmount, ref} from 'vue'
 import {ElMessage, ElMessageBox} from 'element-plus'
-import {RefreshRight, Setting} from '@element-plus/icons-vue'
 import BaseUploadMap from '@/components/BaseUploadMap/index.vue'
 import UploadMap3DGlobe from '@/components/UploadMap3DGlobe/index.vue'
+import InternetMap3DToolbar from '@/components/InternetMap3DToolbar/index.vue'
 import {filterGraphByIXRoutersData, MapUi, type UploadMapUiOtherConfiguration} from './ui'
 import {DataSource} from './datasource'
-import {createGlobeGraph, type GlobeGraph} from './services/globeGraph'
+import {createGlobeGraph, type GlobeGraph, type GlobeNode} from './services/globeGraph'
 import {allLoading} from '@/utils/tools'
 import type {Edge, Vertex} from '@/utils/map-datasource'
+import { augmentAsHighlight, isTransitRouter, waitForBrowserPaint } from '@/view/map/shared/map3dGraph'
 
 const uploadMapUiOtherConfiguration: UploadMapUiOtherConfiguration = {}
 const mapData = ref()
 const displayMode = ref<'2d' | '3d'>()
 const showAllNodes = ref(false)
 const nodeScale = ref(2)
-const showRouterNodes = ref(true)
+const showRouterLabels = ref(true)
 const settingsOpen = ref(false)
+const baseGlobeGraph = ref<GlobeGraph>({nodes: [], edges: []})
 const globeGraph = ref<GlobeGraph>({nodes: [], edges: []})
 const globeLoadingVisible = ref(false)
 const ixOptions = ref<{ label: string; value: string }[]>([])
 const selected3DIxLabels = ref<string[]>([])
+const expandedRouterParentIds = ref<string[]>([])
+const ixCount = ref(0)
+const orientToInitialNode = ref(true)
+const waitingForGraphRender = ref(false)
+const selectedAsn = ref<string>()
+const selectedAsSourceId = ref<string>()
 let globeLoading: ReturnType<typeof allLoading> | undefined
 let cached3DGraphSource: { vertices: Vertex[]; edges: Edge[] } | undefined
 
-function waitForBrowserPaint() {
-  return new Promise<void>((resolve) => {
-    requestAnimationFrame(() => setTimeout(resolve, 0))
-  })
-}
+const ixCountMax = computed(() => ixOptions.value.length)
 
 async function chooseDisplayMode() {
   try {
@@ -77,11 +81,12 @@ async function chooseNodeScope() {
 function set3DIxOptions(mapUi: MapUi) {
   ixOptions.value = mapUi.getIxs()
       .map((ix: any) => ({
-        label: ix.meta?.emulatorInfo?.displayname ?? ix.meta?.emulatorInfo?.name,
+        label: ix.meta?.emulatorInfo?.displayname || ix.meta?.emulatorInfo?.name,
         value: ix.meta?.emulatorInfo?.name,
       }))
-      .filter((item: { label?: string; value?: string }) => item.label && item.value)
-  selected3DIxLabels.value = []
+      .filter((item): item is { label: string; value: string } => Boolean(item.label && item.value))
+  selected3DIxLabels.value = ixOptions.value.map((item) => item.value)
+  ixCount.value = ixOptions.value.length
 }
 
 async function createGraphData(data: unknown): Promise<GlobeGraph> {
@@ -107,6 +112,59 @@ async function getCached3DGraphSource() {
   return cached3DGraphSource
 }
 
+async function renderSelectedAsGraph() {
+  if (!selectedAsn.value) {
+    globeGraph.value = baseGlobeGraph.value
+    return
+  }
+
+  const {vertices, edges} = await getCached3DGraphSource()
+  globeGraph.value = augmentAsHighlight(
+      baseGlobeGraph.value,
+      vertices,
+      edges,
+      selectedAsn.value,
+      selectedAsSourceId.value,
+  )
+}
+
+async function renderSelectedIXGraph() {
+  if (!mapData.value) return
+  if (selected3DIxLabels.value.length === 0) {
+    baseGlobeGraph.value = {nodes: [], edges: []}
+    globeGraph.value = {nodes: [], edges: []}
+    expandedRouterParentIds.value = []
+    selectedAsn.value = undefined
+    selectedAsSourceId.value = undefined
+    return
+  }
+
+  const {vertices, edges} = await getCached3DGraphSource()
+  const {filteredNodes, filteredEdges} = filterGraphByIXRoutersData(vertices, edges, selected3DIxLabels.value)
+  baseGlobeGraph.value = createGlobeGraph(filteredNodes, filteredEdges)
+  await renderSelectedAsGraph()
+}
+
+async function renderWithLoading(orientToGraph = true) {
+  globeLoadingVisible.value = true
+  await nextTick()
+  await waitForBrowserPaint()
+
+  try {
+    orientToInitialNode.value = orientToGraph
+    waitingForGraphRender.value = true
+    await renderSelectedIXGraph()
+    if (globeGraph.value.nodes.length === 0) {
+      ElMessage.warning('No IX nodes with geographic coordinates were found.')
+    }
+  } catch (error) {
+    console.error('3D IX graph calculation failed:', error)
+    ElMessage.error('3D IX graph calculation failed.')
+    waitingForGraphRender.value = false
+    globeLoadingVisible.value = false
+  }
+}
+
 async function handleParsedMap(value: unknown, parsedMapUi?: any) {
   try {
     await chooseDisplayMode()
@@ -122,14 +180,17 @@ async function handleParsedMap(value: unknown, parsedMapUi?: any) {
     }
 
     if (displayMode.value === '3d') {
-      if (!showAllNodes.value) {
-        set3DIxOptions(parsedMapUi as MapUi)
-        settingsOpen.value = true
-      }
+      set3DIxOptions(parsedMapUi as MapUi)
+      settingsOpen.value = false
 
       mapData.value = value
       cached3DGraphSource = undefined
+      baseGlobeGraph.value = {nodes: [], edges: []}
       globeGraph.value = {nodes: [], edges: []}
+      expandedRouterParentIds.value = []
+      selectedAsn.value = undefined
+      selectedAsSourceId.value = undefined
+      orientToInitialNode.value = true
       await nextTick()
       await waitForBrowserPaint()
 
@@ -137,9 +198,10 @@ async function handleParsedMap(value: unknown, parsedMapUi?: any) {
         await nextTick()
         await waitForBrowserPaint()
         if (showAllNodes.value) {
-          globeGraph.value = await createGraphData(value)
+          baseGlobeGraph.value = await createGraphData(value)
+          await renderSelectedAsGraph()
         } else {
-          globeGraph.value = {nodes: [], edges: []}
+          await renderWithLoading()
         }
         if (globeGraph.value.nodes.length === 0) {
           ElMessage.warning('No IX nodes with geographic coordinates were found.')
@@ -160,11 +222,18 @@ async function handleParsedMap(value: unknown, parsedMapUi?: any) {
     displayMode.value = undefined
     showAllNodes.value = false
     nodeScale.value = 2
-    showRouterNodes.value = true
+    showRouterLabels.value = true
     settingsOpen.value = false
+    baseGlobeGraph.value = {nodes: [], edges: []}
     globeGraph.value = {nodes: [], edges: []}
     ixOptions.value = []
     selected3DIxLabels.value = []
+    expandedRouterParentIds.value = []
+    ixCount.value = 0
+    orientToInitialNode.value = true
+    waitingForGraphRender.value = false
+    selectedAsn.value = undefined
+    selectedAsSourceId.value = undefined
     cached3DGraphSource = undefined
     globeLoading?.close()
     globeLoading = undefined
@@ -173,33 +242,70 @@ async function handleParsedMap(value: unknown, parsedMapUi?: any) {
   }
 }
 
-async function update3DIxGraph() {
-  if (showAllNodes.value || !mapData.value) return
-  if (selected3DIxLabels.value.length === 0) {
-    globeGraph.value = {nodes: [], edges: []}
-    return
-  }
-
-  globeLoadingVisible.value = true
-  await nextTick()
-  await waitForBrowserPaint()
-
-  try {
-    const {vertices, edges} = await getCached3DGraphSource()
-    const {filteredNodes, filteredEdges} = filterGraphByIXRoutersData(vertices, edges, selected3DIxLabels.value)
-    globeGraph.value = createGlobeGraph(filteredNodes, filteredEdges)
-  } catch (error) {
-    console.error('3D IX graph calculation failed:', error)
-    ElMessage.error('3D IX graph calculation failed.')
-  } finally {
-    globeLoadingVisible.value = false
-  }
+function applyIxCount(value: number | undefined) {
+  const count = Math.max(0, Math.min(value ?? 0, ixOptions.value.length))
+  selected3DIxLabels.value = ixOptions.value.slice(0, count).map((item) => item.value)
+  expandedRouterParentIds.value = []
+  selectedAsn.value = undefined
+  selectedAsSourceId.value = undefined
 }
 
-function onGlobeRendered() {
+function applyIxSelection() {
+  ixCount.value = selected3DIxLabels.value.length
+  expandedRouterParentIds.value = []
+  selectedAsn.value = undefined
+  selectedAsSourceId.value = undefined
+}
+
+function onGlobeRendered(renderedGraph: GlobeGraph) {
+  if (waitingForGraphRender.value && renderedGraph === globeGraph.value) {
+    waitingForGraphRender.value = false
+  }
+  if (orientToInitialNode.value && renderedGraph.nodes.length > 0) {
+    orientToInitialNode.value = false
+  }
   globeLoading?.close()
   globeLoading = undefined
   globeLoadingVisible.value = false
+}
+
+async function onGlobeNodeClick(node: GlobeNode) {
+  if (node.kind === 'star') {
+    if (expandedRouterParentIds.value.includes(node.id)) {
+      expandedRouterParentIds.value = expandedRouterParentIds.value.filter((id) => id !== node.id)
+    } else {
+      expandedRouterParentIds.value = [...expandedRouterParentIds.value, node.id]
+    }
+    return
+  }
+
+  if (node.kind !== 'dot' || !node.sourceId) {
+    ElMessage.warning('Please select an AS router node.')
+    return
+  }
+
+  const {vertices} = await getCached3DGraphSource()
+  const vertex = vertices.find((item) => item.id === node.sourceId)
+  if (!isTransitRouter(vertex)) {
+    ElMessage.warning('Please select an AS router node.')
+    return
+  }
+
+  const asn = vertex?.group
+  if (!asn) {
+    ElMessage.warning('Please select an AS router node.')
+    return
+  }
+
+  if (selectedAsn.value === String(asn)) {
+    selectedAsn.value = undefined
+    selectedAsSourceId.value = undefined
+  } else {
+    selectedAsn.value = String(asn)
+    selectedAsSourceId.value = node.sourceId
+  }
+
+  await renderSelectedAsGraph()
 }
 
 onBeforeUnmount(() => {
@@ -213,11 +319,18 @@ function resetUpload() {
   displayMode.value = undefined
   showAllNodes.value = false
   nodeScale.value = 2
-  showRouterNodes.value = true
+  showRouterLabels.value = true
   settingsOpen.value = false
+  baseGlobeGraph.value = {nodes: [], edges: []}
   globeGraph.value = {nodes: [], edges: []}
   ixOptions.value = []
   selected3DIxLabels.value = []
+  expandedRouterParentIds.value = []
+  ixCount.value = 0
+  orientToInitialNode.value = true
+  waitingForGraphRender.value = false
+  selectedAsn.value = undefined
+  selectedAsSourceId.value = undefined
   cached3DGraphSource = undefined
   globeLoading?.close()
   globeLoading = undefined
@@ -230,81 +343,30 @@ function resetUpload() {
     <UploadMap3DGlobe
         :graph="globeGraph"
         :node-scale="nodeScale"
-        :show-router-nodes="showRouterNodes"
+        :show-router-labels="showRouterLabels"
+        :expanded-router-parent-ids="expandedRouterParentIds"
+        :orient-to-graph="orientToInitialNode"
         @rendered="onGlobeRendered"
+        @node-click="onGlobeNodeClick"
     />
-    <section class="upload-map-3d-toolbar">
-      <div class="upload-map-3d-summary">
-        <strong>3D Internet Map</strong>
-        <span>{{ globeGraph.nodes.length }} nodes / {{ globeGraph.edges.length }} links</span>
-      </div>
-      <div class="upload-map-3d-controls">
-        <el-tooltip content="Settings" placement="bottom">
-          <el-button
-              class="upload-map-3d-icon-button"
-              :class="{ 'is-active': settingsOpen }"
-              :icon="Setting"
-              circle
-              size="small"
-              @click="settingsOpen = !settingsOpen"
-          />
-        </el-tooltip>
-        <el-button
-            class="upload-map-3d-reload-button"
-            :icon="RefreshRight"
-            size="small"
-            @click="resetUpload"
-        >
-          Reload
-        </el-button>
-      </div>
-
-      <section v-show="settingsOpen" class="upload-map-3d-settings">
-        <label class="upload-map-3d-slider">
-          <span>Node / link scale</span>
-          <el-slider
-              v-model="nodeScale"
-              :min="0.5"
-              :max="4"
-              :step="0.1"
-              :show-tooltip="false"
-          />
-          <output>{{ nodeScale.toFixed(1) }}x</output>
-        </label>
-        <el-checkbox v-model="showRouterNodes" class="upload-map-3d-check">
-          Router nodes
-        </el-checkbox>
-        <div v-if="!showAllNodes" class="upload-map-3d-ix-select">
-          <span>IX</span>
-          <div class="upload-map-3d-ix-action">
-            <el-select
-                v-model="selected3DIxLabels"
-                multiple
-                collapse-tags
-                collapse-tags-tooltip
-                filterable
-                clearable
-                placeholder="Select IX"
-            >
-              <el-option
-                  v-for="item in ixOptions"
-                  :key="item.value"
-                  :label="item.label"
-                  :value="item.value"
-              />
-            </el-select>
-            <el-button
-                size="small"
-                type="primary"
-                :disabled="selected3DIxLabels.length === 0"
-                @click="update3DIxGraph"
-            >
-              Confirm
-            </el-button>
-          </div>
-        </div>
-      </section>
-    </section>
+    <InternetMap3DToolbar
+        v-model:node-scale="nodeScale"
+        v-model:show-router-labels="showRouterLabels"
+        v-model:settings-open="settingsOpen"
+        v-model:ix-count="ixCount"
+        v-model:selected-ix-labels="selected3DIxLabels"
+        title="3D Internet Map"
+        :node-count="globeGraph.nodes.length"
+        :edge-count="globeGraph.edges.length"
+        :ix-options="ixOptions"
+        :ix-count-max="ixCountMax"
+        :show-ix-controls="true"
+        :confirm-disabled="selected3DIxLabels.length === 0"
+        @reload="resetUpload"
+        @confirm="renderWithLoading"
+        @ix-count-change="applyIxCount"
+        @ix-selection-change="applyIxSelection"
+    />
     <section v-if="globeLoadingVisible" class="upload-map-3d-loading">
       <div class="upload-map-3d-loading-box">
         <span class="upload-map-3d-loading-spinner"/>

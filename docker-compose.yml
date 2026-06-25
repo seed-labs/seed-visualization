@@ -1,0 +1,47 @@
+services:
+  emulator-service:
+    container_name: emulator-service
+    build:
+      context: emulator-service
+      dockerfile: Dockerfile
+    environment:
+      BACKEND_ENV: production
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    ports:
+      - "7071:7071"
+    networks:
+      - internet-map
+    restart: unless-stopped
+
+  internet-map:
+    container_name: internet-map
+    build:
+      context: internet-map
+      dockerfile: Dockerfile
+    depends_on:
+      - emulator-service
+    ports:
+      - "8080:80"
+      - "8081:8081"
+    networks:
+      - internet-map
+    restart: unless-stopped
+
+  satellite-emulator:
+    container_name: satellite-emulator
+    build:
+      context: satellite-emulator
+      dockerfile: Dockerfile
+    depends_on:
+      - emulator-service
+    ports:
+      - "9090:80"
+      - "9091:9091"
+    networks:
+      - internet-map
+    restart: unless-stopped
+
+networks:
+  internet-map:
+    driver: bridge

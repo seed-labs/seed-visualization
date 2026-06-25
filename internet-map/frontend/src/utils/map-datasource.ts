@@ -170,7 +170,7 @@ export class DataSource {
                 }
             }
         })
-        const host = import.meta.env.MODE === 'development' ? import.meta.env.VITE_PROXY_ADDRESS.replace(/^https?:\/\//, '') : location.host
+        const host = import.meta.env.MODE === 'development' ? import.meta.env.VITE_PROXY_EMULATOR_ADDRESS.replace(/^https?:\/\//, '') : location.host
         this._socket = new WebSocket(`${this._wsProtocol}://${host}${import.meta.env.VITE_SERVER_URL_PREFIX}/sniff`);
         this._socket.addEventListener('message', (ev) => {
             let msg = ev.data.toString();

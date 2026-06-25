@@ -90,9 +90,10 @@ export default defineConfig(({mode}) => {
                     changeOrigin: true,
                     // rewrite: (path) => path.replace(new RegExp(env.VITE_APP_BASE_URL), ''),
                 },
-                '/satellite-tiles': {
-                    target: env.VITE_SATELLITE_TILES_PROXY_ADDRESS,
+                [env.VITE_SERVER_EMULATOR_URL_PREFIX]: {
+                    target: env.VITE_PROXY_EMULATOR_ADDRESS,
                     changeOrigin: true,
+                    rewrite: (path) => path.replace(new RegExp(env.VITE_SERVER_EMULATOR_URL_PREFIX), '/api/v1'),
                 },
             },
         },

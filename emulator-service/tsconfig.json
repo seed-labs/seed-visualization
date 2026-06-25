@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "module": "commonjs",
+    "noImplicitAny": true,
+    "removeComments": true,
+    "preserveConstEnums": true,
+    "esModuleInterop": true,
+    "sourceMap": true,
+    "skipLibCheck": true,
+    "types": ["node", "jest"],
+    "outDir": "bin/",
+    "lib": ["ES2015", "DOM", "ESNext.Disposable"]
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules"]
+}

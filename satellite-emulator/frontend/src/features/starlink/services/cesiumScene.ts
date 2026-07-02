@@ -24,6 +24,7 @@
 import { sampleOrbit } from '@/features/starlink/services/orbitService';
 import type {
   GroundStation,
+  InterSatelliteLink,
   PlannedOrbitRecord,
   SatelliteGroundLink,
   SatellitePoint,
@@ -39,6 +40,7 @@ const ORBIT_COLOR = Color.fromCssColorString('#ff6b3a').withAlpha(0.42);
 const STATION_COLOR = Color.fromCssColorString('#28d7ff');
 const STATION_INNER_COLOR = Color.fromCssColorString('#063f68');
 const LINK_COLOR = Color.fromCssColorString('#45f3ff').withAlpha(0.62);
+const SATELLITE_LINK_COLOR = Color.fromCssColorString('#ffe66d').withAlpha(0.72);
 const GROUND_LINK_ARC_SEGMENTS = 48;
 const GROUND_LINK_MIN_ARC_LIFT_METERS = 260_000;
 const GROUND_LINK_MAX_ARC_LIFT_METERS = 1_400_000;
@@ -109,6 +111,7 @@ export type RenderOptions = {
   highlightedIds: string[];
   groundStations: GroundStation[];
   groundLinks: SatelliteGroundLink[];
+  satelliteLinks: InterSatelliteLink[];
   focusedSatelliteId?: string;
   focusedStationId?: string;
   focusSatelliteZoom: boolean;
@@ -199,6 +202,7 @@ export function createCesiumScene(container: HTMLElement): CesiumSceneApi {
   const labels = viewer.scene.primitives.add(new LabelCollection());
   const orbitLines = viewer.scene.primitives.add(new PolylineCollection());
   const groundLinkLines = viewer.scene.primitives.add(new PolylineCollection());
+  const satelliteLinkLines = viewer.scene.primitives.add(new PolylineCollection());
   const gridLines = viewer.scene.primitives.add(new PolylineCollection());
   for (let longitude = -180; longitude <= 180; longitude += 15) {
     gridLines.add({
@@ -254,6 +258,7 @@ export function createCesiumScene(container: HTMLElement): CesiumSceneApi {
     labels.removeAll();
     orbitLines.removeAll();
     groundLinkLines.removeAll();
+    satelliteLinkLines.removeAll();
     pointBySatelliteId.clear();
     const highlightedIds = new Set(options.highlightedIds);
     const satelliteById = new Map(satellites.map((satellite) => [satellite.id, satellite]));
@@ -352,6 +357,31 @@ export function createCesiumScene(container: HTMLElement): CesiumSceneApi {
         positions: createGroundLinkArcPositions(satellite, station),
         width: 1.8,
         material: createDashMaterial(LINK_COLOR),
+      });
+    });
+
+    options.satelliteLinks.forEach((link) => {
+      const satelliteA = satelliteById.get(link.satelliteAId);
+      const satelliteB = satelliteById.get(link.satelliteBId);
+      if (!satelliteA || !satelliteB) {
+        return;
+      }
+
+      satelliteLinkLines.add({
+        positions: [
+          Cartesian3.fromDegrees(
+            satelliteA.longitude,
+            satelliteA.latitude,
+            satelliteA.altitudeKm * 1000,
+          ),
+          Cartesian3.fromDegrees(
+            satelliteB.longitude,
+            satelliteB.latitude,
+            satelliteB.altitudeKm * 1000,
+          ),
+        ],
+        width: 1.6,
+        material: createDashMaterial(SATELLITE_LINK_COLOR),
       });
     });
 

@@ -11,6 +11,7 @@ import {
 } from '@/features/starlink/services/cesiumScene';
 import type {
   GroundStation,
+  InterSatelliteLink,
   PlannedOrbitRecord,
   SatelliteGroundLink,
   SatellitePoint,
@@ -23,6 +24,7 @@ const props = defineProps<{
   highlightedIds: string[];
   groundStations: GroundStation[];
   groundLinks: SatelliteGroundLink[];
+  satelliteLinks: InterSatelliteLink[];
   focusedSatelliteId?: string;
   focusedStationId?: string;
   focusSatelliteZoom: boolean;
@@ -44,6 +46,7 @@ function render() {
     highlightedIds: props.highlightedIds,
     groundStations: props.groundStations,
     groundLinks: props.groundLinks,
+    satelliteLinks: props.satelliteLinks,
     focusedSatelliteId: props.focusedSatelliteId,
     focusedStationId: props.focusedStationId,
     focusSatelliteZoom: props.focusSatelliteZoom,
@@ -71,6 +74,7 @@ watch(
     props.highlightedIds,
     props.groundStations,
     props.groundLinks,
+    props.satelliteLinks,
     props.focusedSatelliteId,
     props.focusedStationId,
     props.focusSatelliteZoom,

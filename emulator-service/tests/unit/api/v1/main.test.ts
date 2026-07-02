@@ -2,6 +2,7 @@ import express from 'express';
 import expressWs from 'express-ws';
 import request from 'supertest';
 import { containerFixture, networkFixture, nonSeedContainerFixture } from '../../../fixtures/docker';
+import {errorHandler, notFoundHandler} from '../../../../src/middleware/error-handler';
 
 const dockerMock = {
   listContainers: jest.fn(),
@@ -51,9 +52,16 @@ jest.mock('dockerode', () => jest.fn(() => dockerMock));
 
 function createTestApp() {
   const app = express();
-  expressWs(app);
-  const apiV1Router = require('../../../../src/api/v1/main');
+  const wsInstance = expressWs(app);
+  const {
+    default: apiV1Router,
+    registerWebSocketRoutes,
+  } = require('../../../../src/api/v1/main');
+  wsInstance.applyTo(apiV1Router);
+  registerWebSocketRoutes();
   app.use('/api/v1', apiV1Router);
+  app.use(notFoundHandler);
+  app.use(errorHandler);
   return app;
 }
 
@@ -75,14 +83,29 @@ describe('api v1 router', () => {
     expect(response.body.result[0].meta.emulatorInfo.name).toBe('router-a');
   });
 
-  it('returns api failure when docker listContainers fails', async () => {
+  it('returns a sanitized server error when docker listContainers fails', async () => {
     dockerMock.listContainers.mockRejectedValue(new Error('docker unavailable'));
 
-    const response = await request(app).get('/api/v1/container').expect(200);
+    const response = await request(app).get('/api/v1/container').expect(500);
 
     expect(response.body).toEqual({
       ok: false,
-      result: 'Error: docker unavailable',
+      error: {
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'Internal server error',
+      },
+    });
+  });
+
+  it('returns a structured response for unknown API routes', async () => {
+    const response = await request(app).get('/api/v1/missing').expect(404);
+
+    expect(response.body).toEqual({
+      ok: false,
+      error: {
+        code: 'NOT_FOUND',
+        message: 'API not found: GET /api/v1/missing',
+      },
     });
   });
 

@@ -2,6 +2,7 @@ import express from 'express';
 import expressWs from 'express-ws';
 import request from 'supertest';
 import { getDockerEndpointDescription } from '../../../../src/utils/docker-client';
+import {errorHandler, notFoundHandler} from '../../../../src/middleware/error-handler';
 
 const MISSING_CONTAINER_ID = 'missing-integration-container-id';
 const UNKNOWN_PLUGIN = '__integration_unknown_plugin__';
@@ -13,9 +14,16 @@ const mutationIt = runMutationTests ? it : it.skip;
 
 function createTestApp() {
   const app = express();
-  expressWs(app);
-  const apiV1Router = require('../../../../src/api/v1/main');
+  const wsInstance = expressWs(app);
+  const {
+    default: apiV1Router,
+    registerWebSocketRoutes,
+  } = require('../../../../src/api/v1/main');
+  wsInstance.applyTo(apiV1Router);
+  registerWebSocketRoutes();
   app.use('/api/v1', apiV1Router);
+  app.use(notFoundHandler);
+  app.use(errorHandler);
   return app;
 }
 

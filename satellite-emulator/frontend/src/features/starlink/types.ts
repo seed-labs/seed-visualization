@@ -43,6 +43,25 @@ export type SatelliteGroundLinkFrame = {
   completed?: boolean;
 };
 
+export type InterSatelliteLink = {
+  satelliteAId: string;
+  satelliteBId: string;
+};
+
+export type SatelliteLinksRequest = {
+  interval: string;
+  satelliteLinks: InterSatelliteLink[][];
+  timestamp: string;
+};
+
+export type SatelliteLinkFrame = {
+  links: InterSatelliteLink[];
+  sampleTime: Date;
+  requestIndex: number;
+  groupIndex: number;
+  completed?: boolean;
+};
+
 export type GroundLinkState = {
   groundStationId?: string;
   satelliteId?: string;
@@ -56,6 +75,7 @@ export type GroundLinksRequest = {
 
 export type SimulationSettings = {
   speed: number;
+  customTimeEnabled: boolean;
   showOrbits: boolean;
   showLabels: boolean;
   focusSatelliteZoom: boolean;

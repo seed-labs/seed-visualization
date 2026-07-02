@@ -1,24 +1,18 @@
-import express, { Request, Response } from 'express';
-import path from 'path';
+import express from 'express';
 import expressWs from 'express-ws';
 
 const app = express();
-expressWs(app);
+const wsInstance = expressWs(app);
 
-import apiV1Router from './api/v1/main';
+import apiV1Router, {registerWebSocketRoutes} from './api/v1/main';
+import {errorHandler, notFoundHandler} from './middleware/error-handler';
 
-// const frontendPath = path.resolve(__dirname, '../../frontend/dist/frontend');
-//
-// app.use('/static', express.static(path.join(frontendPath)));
+wsInstance.applyTo(apiV1Router);
+registerWebSocketRoutes();
 
 app.use('/api/v1', apiV1Router);
+app.use(notFoundHandler);
+app.use(errorHandler);
 
-// app.get('/pro/*', (req: Request, res: Response) => {
-//   res.sendFile(path.join(frontendPath, 'index.html'));
-// });
-
-// app.get('/', (req: Request, res: Response) => {
-//   res.redirect('/pro/home');
-// });
 
 app.listen(7071, '0.0.0.0');

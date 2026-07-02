@@ -2,19 +2,35 @@ import { appConfig } from '@/config/env';
 import type {
   GroundLinksRequest,
   GroundLinkState,
+  InterSatelliteLink,
+  SatelliteLinkFrame,
+  SatelliteLinksRequest,
   SatelliteGroundLinkFrame,
   SatelliteGroundLink,
 } from '@/features/starlink/types';
 
-export type SatelliteDataEvent = 'ground-links' | 'dead';
+export type SatelliteDataEvent = 'ground-links' | 'satellite-links' | 'dead';
 
 type GroundLinksMessage = {
   type: 'SATELLITE_GROUND_LINKS';
   result: GroundLinksRequest | GroundLinksRequest[];
 };
 
+type SatelliteLinksMessage = {
+  type: 'SATELLITE_LINKS';
+  result: SatelliteLinksRequest | SatelliteLinksRequest[];
+};
+
 type GroundLinkPlaybackFrame = {
   links: GroundLinkState[];
+  offsetMs: number;
+  holdMs: number;
+  requestIndex: number;
+  groupIndex: number;
+};
+
+type SatelliteLinkPlaybackFrame = {
+  links: InterSatelliteLink[];
   offsetMs: number;
   holdMs: number;
   requestIndex: number;
@@ -66,6 +82,41 @@ function isGroundLinksRequest(value: unknown): value is GroundLinksRequest {
   );
 }
 
+function isInterSatelliteLink(value: unknown): value is InterSatelliteLink {
+  const link = value as InterSatelliteLink;
+
+  return Boolean(
+    link &&
+    typeof link.satelliteAId === 'string' &&
+    typeof link.satelliteBId === 'string',
+  );
+}
+
+function isSatelliteLinksRequest(value: unknown): value is SatelliteLinksRequest {
+  const request = value as SatelliteLinksRequest;
+
+  return Boolean(
+    request &&
+    typeof request.interval === 'string' &&
+    typeof request.timestamp === 'string' &&
+    Array.isArray(request.satelliteLinks) &&
+    request.satelliteLinks.every(
+      (links) => Array.isArray(links) && links.every(isInterSatelliteLink),
+    ),
+  );
+}
+
+function isSatelliteLinksMessage(value: unknown): value is SatelliteLinksMessage {
+  const message = value as SatelliteLinksMessage;
+
+  return Boolean(
+    message &&
+    message.type === 'SATELLITE_LINKS' &&
+    (isSatelliteLinksRequest(message.result) ||
+      (Array.isArray(message.result) && message.result.every(isSatelliteLinksRequest))),
+  );
+}
+
 function parseMilliseconds(value: string) {
   const trimmedValue = value.trim().toLowerCase();
   const milliseconds = trimmedValue.endsWith('ms')
@@ -95,7 +146,9 @@ export class SatelliteDataSource {
   private _socket?: WebSocket;
   private _connected = false;
   private _groundLinkTimers: number[] = [];
+  private _satelliteLinkTimers: number[] = [];
   private _groundLinksEventHandler: (data: SatelliteGroundLinkFrame) => void = () => undefined;
+  private _satelliteLinksEventHandler: (data: SatelliteLinkFrame) => void = () => undefined;
   private _errorHandler: (error: Event | CloseEvent | unknown) => void = () => undefined;
 
   constructor(private readonly _getSimulationSpeed: () => number = () => 1) {}
@@ -107,7 +160,7 @@ export class SatelliteDataSource {
 
     const host = getWebSocketHost();
     const protocol = getWebSocketProtocol();
-    this._socket = new WebSocket(`${protocol}://${host}${appConfig.api.basePath}/satellite/ground-links`);
+    this._socket = new WebSocket(`${protocol}://${host}${appConfig.api.basePath}/satellite/link-updates`);
 
     this._socket.addEventListener('message', (event) => {
       try {
@@ -115,6 +168,9 @@ export class SatelliteDataSource {
         if (isGroundLinksMessage(message)) {
           const requests = Array.isArray(message.result) ? message.result : [message.result];
           this.scheduleGroundLinks(requests);
+        } else if (isSatelliteLinksMessage(message)) {
+          const requests = Array.isArray(message.result) ? message.result : [message.result];
+          this.scheduleSatelliteLinks(requests);
         }
       } catch (error) {
         this._errorHandler(error);
@@ -136,16 +192,21 @@ export class SatelliteDataSource {
   disconnect() {
     this._connected = false;
     this.clearGroundLinkTimers();
+    this.clearSatelliteLinkTimers();
     this._socket?.close();
     this._socket = undefined;
   }
 
   on(eventName: 'ground-links', callback: (data: SatelliteGroundLinkFrame) => void): void;
+  on(eventName: 'satellite-links', callback: (data: SatelliteLinkFrame) => void): void;
   on(eventName: 'dead', callback: (data: unknown) => void): void;
   on(eventName: SatelliteDataEvent, callback: (data: any) => void = () => undefined) {
     switch (eventName) {
       case 'ground-links':
         this._groundLinksEventHandler = callback as (data: SatelliteGroundLinkFrame) => void;
+        break;
+      case 'satellite-links':
+        this._satelliteLinksEventHandler = callback as (data: SatelliteLinkFrame) => void;
         break;
       case 'dead':
         this._errorHandler = callback;
@@ -158,6 +219,11 @@ export class SatelliteDataSource {
     this._groundLinkTimers = [];
   }
 
+  private clearSatelliteLinkTimers() {
+    this._satelliteLinkTimers.forEach((timer) => window.clearTimeout(timer));
+    this._satelliteLinkTimers = [];
+  }
+
   private scheduleGroundLinks(requests: GroundLinksRequest[]) {
     this.clearGroundLinkTimers();
     const receivedAtMs = Date.now();
@@ -168,6 +234,7 @@ export class SatelliteDataSource {
       const intervalMs = parseMilliseconds(request.interval);
 
       request.groundLinks.forEach((links, index) => {
+        // links = links.filter((link) => link.satelliteId === "940192")
         playbackFrames.push({
           links,
           offsetMs: offsetMs + index * intervalMs,
@@ -221,6 +288,75 @@ export class SatelliteDataSource {
 
   private emitGroundLinksCompleted(sampleTime: Date) {
     this._groundLinksEventHandler({
+      links: [],
+      sampleTime,
+      requestIndex: -1,
+      groupIndex: -1,
+      completed: true,
+    });
+  }
+
+  private scheduleSatelliteLinks(requests: SatelliteLinksRequest[]) {
+    this.clearSatelliteLinkTimers();
+    const receivedAtMs = Date.now();
+    const playbackFrames: SatelliteLinkPlaybackFrame[] = [];
+    let offsetMs = 0;
+
+    requests.forEach((request, requestIndex) => {
+      const intervalMs = parseMilliseconds(request.interval);
+
+      request.satelliteLinks.forEach((links, index) => {
+        playbackFrames.push({
+          links,
+          offsetMs: offsetMs + index * intervalMs,
+          holdMs: intervalMs,
+          requestIndex,
+          groupIndex: index,
+        });
+      });
+
+      offsetMs += request.satelliteLinks.length * intervalMs;
+    });
+
+    if (!playbackFrames.length) {
+      this.emitSatelliteLinksCompleted(new Date(receivedAtMs));
+      return;
+    }
+
+    this.playSatelliteLinkFrame(playbackFrames, 0, receivedAtMs);
+  }
+
+  private playSatelliteLinkFrame(
+    frames: SatelliteLinkPlaybackFrame[],
+    index: number,
+    receivedAtMs: number,
+  ) {
+    const frame = frames[index];
+    this._satelliteLinksEventHandler({
+      links: frame.links,
+      sampleTime: new Date(receivedAtMs + frame.offsetMs),
+      requestIndex: frame.requestIndex,
+      groupIndex: frame.groupIndex,
+    });
+
+    const nextFrame = frames[index + 1];
+    const nextDelayMs = nextFrame ? nextFrame.offsetMs - frame.offsetMs : frame.holdMs;
+    const nextAction = () => {
+      if (nextFrame) {
+        this.playSatelliteLinkFrame(frames, index + 1, receivedAtMs);
+        return;
+      }
+
+      this.emitSatelliteLinksCompleted(new Date(receivedAtMs + frame.offsetMs + frame.holdMs));
+    };
+
+    this._satelliteLinkTimers.push(
+      window.setTimeout(nextAction, this.getPlaybackDelay(nextDelayMs)),
+    );
+  }
+
+  private emitSatelliteLinksCompleted(sampleTime: Date) {
+    this._satelliteLinksEventHandler({
       links: [],
       sampleTime,
       requestIndex: -1,

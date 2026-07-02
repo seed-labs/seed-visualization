@@ -80,8 +80,6 @@ router.get('/env.js', (req, res, next) => {
     };
     res.setHeader('Content-Type', 'application/javascript');
     res.send(`window.__ENV__ = ${JSON.stringify(envVarsForFrontend)}`);
-
-    next();
 });
 router.get('/network', async function (req, res, next) {
     var networks = await runtime.listNetworks();
@@ -102,25 +100,14 @@ router.get('/network', async function (req, res, next) {
         ok: true,
         result: _networks
     });
-
-    next();
 });
 router.get('/container', async function (req, res, next) {
-    try {
-        let containers = await getContainers();
+    const containers = await getContainers();
 
-        res.json({
-            ok: true,
-            result: containers
-        });
-    } catch (e) {
-        res.json({
-            ok: false,
-            result: e.toString()
-        });
-    }
-
-    next();
+    res.json({
+        ok: true,
+        result: containers
+    });
 });
 router.get('/install', async function (req, res, next) {
     res.json({
@@ -144,8 +131,6 @@ router.post('/install', express.json(), async function (req, res, next) {
         }
     }
     res.json(ret);
-
-    next();
 });
 router.post('/uninstall', express.json(), async function (req, res, next) {
     const plugin = req.body.name
@@ -162,8 +147,6 @@ router.post('/uninstall', express.json(), async function (req, res, next) {
         }
     }
     res.json(ret);
-
-    next();
 });
 router.get('/container/:id', async function (req, res, next) {
     var id = req.params.id;
@@ -186,8 +169,6 @@ router.get('/container/:id', async function (req, res, next) {
             ok: true, result
         });
     }
-
-    next();
 });
 router.get('/container/:id/net', async function (req, res, next) {
     let id = req.params.id;
@@ -200,7 +181,6 @@ router.get('/container/:id/net', async function (req, res, next) {
             ok: false,
             result: `no match or multiple match for container ID ${id}.`
         });
-        next();
         return;
     }
 
@@ -210,8 +190,6 @@ router.get('/container/:id/net', async function (req, res, next) {
         ok: true,
         result: await controller.isNetworkConnected(node.Id)
     });
-
-    next();
 });
 router.post('/container/:id/net', express.json(), async function (req, res, next) {
     let id = req.params.id;
@@ -224,7 +202,6 @@ router.post('/container/:id/net', express.json(), async function (req, res, next
             ok: false,
             result: `no match or multiple match for container ID ${id}.`
         });
-        next();
         return;
     }
 
@@ -235,8 +212,6 @@ router.post('/container/:id/net', express.json(), async function (req, res, next
     res.json({
         ok: true
     });
-
-    next();
 });
 router.post('/container/vis/set', express.json(), async function (req, res, next) {
     let id = req.query.id as string;
@@ -250,7 +225,6 @@ router.post('/container/vis/set', express.json(), async function (req, res, next
             ok: false,
             result: `no match or multiple match for container ID ${id}.`
         });
-        next();
         return;
     }
     let option = {
@@ -295,23 +269,6 @@ router.post('/container/vis/set', express.json(), async function (req, res, next
             currentFilter: 'success'
         }
     });
-
-    next();
-});
-router.ws('/console/:id', async function (ws, req, next) {
-    try {
-        if (process.env.CONSOLE === 'false') {
-            throw Error('CONSOLE is not enabled');
-        }
-        await socketHandler.handleSession(ws, req.params.id);
-    } catch (e) {
-        if (ws.readyState == 1) {
-            ws.send(`error creating session: ${e}\r\n`);
-            ws.close();
-        }
-    }
-
-    next();
 });
 router.post('/sniff', express.json(), async function (req, res, next) {
     currentSnifferFilter = req.body.filter ?? '';
@@ -343,8 +300,6 @@ router.post('/sniff', express.json(), async function (req, res, next) {
             currentFilter: currentSnifferFilter
         }
     });
-
-    next();
 });
 router.get('/sniff', function (req, res, next) {
     res.json({
@@ -353,20 +308,6 @@ router.get('/sniff', function (req, res, next) {
             currentFilter: currentSnifferFilter
         }
     });
-
-    next();
-});
-router.ws('/sniff', async function (ws, req, next) {
-    snifferSubscribers.push(ws);
-    next();
-});
-router.ws('/container/vis/set', async function (ws, req, next) {
-    visSubscribers.push(ws);
-    next();
-});
-router.ws('/host', async function (ws, req, next) {
-    hostSubscribers.push(ws);
-    next();
 });
 router.post('/host', express.json(), async function (req, res, next) {
     let deadSockets: WebSocket[] = [];
@@ -387,8 +328,6 @@ router.post('/host', express.json(), async function (req, res, next) {
         ok: true,
         result: ""
     });
-
-    next()
 })
 router.get('/container/:id/bgp', async function (req, res, next) {
     let id = req.params.id;
@@ -401,7 +340,6 @@ router.get('/container/:id/bgp', async function (req, res, next) {
             ok: false,
             result: `no match or multiple match for container ID ${id}.`
         });
-        next();
         return;
     }
 
@@ -411,8 +349,6 @@ router.get('/container/:id/bgp', async function (req, res, next) {
         ok: true,
         result: await controller.listBgpPeers(node.Id)
     });
-
-    next();
 });
 router.post('/container/:id/bgp/:peer', express.json(), async function (req, res, next) {
     let id = req.params.id;
@@ -426,7 +362,6 @@ router.post('/container/:id/bgp/:peer', express.json(), async function (req, res
             ok: false,
             result: `no match or multiple match for container ID ${id}.`
         });
-        next();
         return;
     }
 
@@ -437,12 +372,6 @@ router.post('/container/:id/bgp/:peer', express.json(), async function (req, res
     res.json({
         ok: true
     });
-
-    next();
-});
-router.ws('/packet', async function (ws, req, next) {
-    packetSubscribers.push(ws);
-    next();
 });
 router.post('/packet', express.json(), async function (req, res, next) {
     let packetNum = 0
@@ -453,7 +382,6 @@ router.post('/packet', express.json(), async function (req, res, next) {
             ok: false,
             result: `nodeId: ${id} or nodeName: ${req.body.nodeName} does not exist`
         });
-        next();
         return;
     }
     sniffer.setCapturePacketListener((nodeId) => {
@@ -488,8 +416,41 @@ router.post('/packet', express.json(), async function (req, res, next) {
             currentPacketFilter: currentPacketFilter
         }
     });
-
-    next();
 });
 
-export = router;
+export function registerWebSocketRoutes() {
+    router.ws('/console/:id', async function (ws, req, next) {
+        try {
+            if (process.env.CONSOLE === 'false') {
+                throw Error('CONSOLE is not enabled');
+            }
+            const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+            await socketHandler.handleSession(ws, id);
+        } catch (e) {
+            if (ws.readyState == 1) {
+                ws.send(`error creating session: ${e}\r\n`);
+                ws.close();
+            }
+        }
+
+        next();
+    });
+    router.ws('/sniff', async function (ws, req, next) {
+        snifferSubscribers.push(ws);
+        next();
+    });
+    router.ws('/container/vis/set', async function (ws, req, next) {
+        visSubscribers.push(ws);
+        next();
+    });
+    router.ws('/host', async function (ws, req, next) {
+        hostSubscribers.push(ws);
+        next();
+    });
+    router.ws('/packet', async function (ws, req, next) {
+        packetSubscribers.push(ws);
+        next();
+    });
+}
+
+export default router;

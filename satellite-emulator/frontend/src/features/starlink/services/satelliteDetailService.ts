@@ -7,10 +7,11 @@ const MONTH_FORMATTER = new Intl.DateTimeFormat('en-US', {
 });
 
 function formatCoordinate(latitude: number, longitude: number) {
-  const latDirection = latitude >= 0 ? 'N' : 'S';
-  const lonDirection = longitude >= 0 ? 'E' : 'W';
+  // const latDirection = latitude >= 0 ? 'N' : 'S';
+  // const lonDirection = longitude >= 0 ? 'E' : 'W';
 
-  return `${Math.abs(latitude).toFixed(2)} deg ${latDirection}, ${Math.abs(longitude).toFixed(2)} deg ${lonDirection}`;
+  // return ${Math.abs(latitude).toFixed(2)} deg ${latDirection}, ${Math.abs(longitude).toFixed(2)} deg ${lonDirection};
+  return `${latitude.toFixed(4)}°, ${longitude.toFixed(4)}°`;
 }
 
 function formatEpochDate(satellite: SatellitePoint) {

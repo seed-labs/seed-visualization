@@ -113,6 +113,30 @@
     </section>
 
     <section v-if="activeTab === 'settings'" class="settings-tab">
+      <div class="time-control">
+        <div class="time-control-heading">
+          <span>System time</span>
+          <small>{{ settings.customTimeEnabled ? 'Custom' : 'Automatic' }}</small>
+        </div>
+        <label for="simulation-timestamp">Unix timestamp (seconds)</label>
+        <el-input-number
+          id="simulation-timestamp"
+          v-model="timestampInput"
+          :min="0"
+          :max="maxTimestampSeconds"
+          :precision="0"
+          :step="1"
+          controls-position="right"
+        />
+        <small class="time-preview">{{ timestampPreview }}</small>
+        <div class="time-actions">
+          <el-button type="primary" :disabled="!validTimestamp" @click="applySystemTime">
+            Apply
+          </el-button>
+          <el-button @click="resetSystemTime">Use current time</el-button>
+        </div>
+      </div>
+
       <div class="control-row">
         <span>Simulation speed</span>
         <el-segmented
@@ -166,6 +190,7 @@ const props = defineProps<{
   selectedSatellites: SatellitePoint[];
   groundStations: GroundStation[];
   settings: SimulationSettings;
+  currentTime: Date;
   selectedId?: string;
 }>();
 
@@ -177,6 +202,8 @@ const emit = defineEmits<{
   stationSelect: [station: GroundStation];
   stationFocus: [station: GroundStation];
   updateSettings: [settings: SimulationSettings];
+  setSystemTime: [timestampMs: number];
+  resetSystemTime: [];
 }>();
 
 type TabName = 'all' | 'selected' | 'stations' | 'settings';
@@ -187,6 +214,8 @@ const bodyRef = ref<HTMLElement>();
 const scrollTop = ref(0);
 const activeTab = ref<TabName>('all');
 const stationSearch = ref('');
+const timestampInput = ref<number>();
+const maxTimestampSeconds = Math.floor(8_640_000_000_000_000 / 1000);
 const speedOptions = [
   { label: '1x', value: 1 },
   { label: '10x', value: 10 },
@@ -206,6 +235,20 @@ const filteredStations = computed(() => {
       station.city.toLowerCase().includes(keyword) ||
       station.id.toLowerCase().includes(keyword),
   );
+});
+const validTimestamp = computed(
+  () =>
+    typeof timestampInput.value === 'number' &&
+    Number.isFinite(timestampInput.value) &&
+    timestampInput.value >= 0 &&
+    timestampInput.value <= maxTimestampSeconds,
+);
+const timestampPreview = computed(() => {
+  if (!validTimestamp.value) {
+    return 'Enter a valid timestamp';
+  }
+
+  return `${new Date(Math.trunc(timestampInput.value!) * 1000).toISOString()} UTC`;
 });
 const selectedSatelliteIds = computed(
   () => new Set(props.selectedSatellites.map((satellite) => satellite.id)),
@@ -238,6 +281,12 @@ watch(
   },
 );
 
+watch(activeTab, (tab) => {
+  if (tab === 'settings') {
+    syncTimestampInput();
+  }
+});
+
 watch(
   () => [stationSearch.value, filteredStations.value[0]?.id],
   () => {
@@ -260,6 +309,25 @@ function updateSetting<Key extends keyof SimulationSettings>(
     ...props.settings,
     [key]: value,
   });
+}
+
+function syncTimestampInput() {
+  timestampInput.value = Math.floor(props.currentTime.getTime() / 1000);
+}
+
+function applySystemTime() {
+  if (!validTimestamp.value) {
+    return;
+  }
+
+  const timestampMs = Math.trunc(timestampInput.value!) * 1000;
+  emit('setSystemTime', timestampMs);
+  timestampInput.value = timestampMs / 1000;
+}
+
+function resetSystemTime() {
+  emit('resetSystemTime');
+  timestampInput.value = Math.floor(Date.now() / 1000);
 }
 </script>
 

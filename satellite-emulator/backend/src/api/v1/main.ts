@@ -7,9 +7,11 @@ import {SubmitEvent} from '../../utils/submit-event';
 import {PluginManager} from '../../utils/plugin-manager';
 import WebSocket from 'ws';
 import {Controller} from '../../utils/controller';
-import satelliteRouter from './satellite/index';
+import satelliteRouter, {registerWebSocketRoutes} from './satellite/index';
 
 const router = express.Router();
 
 router.use('/satellite', satelliteRouter);
-export = router;
+
+export {registerWebSocketRoutes, satelliteRouter};
+export default router;

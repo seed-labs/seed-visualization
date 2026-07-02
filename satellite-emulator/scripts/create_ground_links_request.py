@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-Generate a GroundLinksRequest JSON payload from planned_shell_orbit.json and mockGroundStations.ts.
+Generate a LinksRequest JSON payload from planned_shell_orbit.json and mockGroundStations.ts.
 
 Examples:
   python satellite-emulator/scripts/create_ground_links_request.py --timestamp now --interval 10s --count 6 --out ground-links.json
-  python satellite-emulator/scripts/create_ground_links_request.py --timestamp 1719123456789 --interval 10s --count 6 --post-url http://127.0.0.1:9090/api/v1/satellite/ground-links
+  python satellite-emulator/scripts/create_ground_links_request.py --timestamp 1719123456789 --interval 10s --count 6 --post-url http://127.0.0.1:9091/api/v1/satellite/links
 """
 
 from __future__ import annotations
@@ -425,7 +425,7 @@ def create_ground_links_request(
         for record in select_satellites(orbit_records, satellite_count)
     ]
 
-    ground_links: list[list[dict[str, str]]] = []
+    link_updates: list[dict[str, list[dict[str, str]]]] = []
     for sample_time in sample_times:
         links: list[dict[str, str]] = []
 
@@ -442,12 +442,17 @@ def create_ground_links_request(
                 }
             )
 
-        ground_links.append(links)
+        link_updates.append(
+            {
+                "groundLinks": links,
+                "satelliteLinks": [],
+            }
+        )
 
     return {
         "timestamp": serialized_timestamp,
         "interval": interval,
-        "groundLinks": ground_links,
+        "links": link_updates,
     }
 
 
@@ -465,18 +470,21 @@ def post_json(url: str, body: dict[str, Any]) -> None:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Create a GroundLinksRequest payload.")
+    parser = argparse.ArgumentParser(description="Create a LinksRequest payload.")
     parser.add_argument("--timestamp", default="now", help="Timestamp: now, milliseconds, seconds, or ISO date.")
     parser.add_argument("--interval", default="1s", help="Interval with unit, for example 1s, 10s, or 500ms.")
-    parser.add_argument("--count", default=300, type=int, help="Number of future groundLinks groups.")
+    parser.add_argument("--count", default=300, type=int, help="Number of future link-update frames.")
     parser.add_argument(
         "--satellites",
         type=int,
         default=DEFAULT_SATELLITE_COUNT,
         help="Satellite count. Defaults to all selected_records.",
     )
-    parser.add_argument("--out", help="Write JSON payload to this file. Defaults to stdout.")
-    parser.add_argument("--post-url", help="POST the JSON payload to this URL after generation.")
+    parser.add_argument(
+        "--out",
+        help="Write JSON payload to this file. With --post-url, defaults to satellite-emulator/tmp/links.json.",
+    )
+    parser.add_argument("--post-url", help="POST the generated JSON file path to this URL.")
     args = parser.parse_args()
 
     if args.count < 0:
@@ -491,17 +499,32 @@ def main() -> int:
         satellite_count=args.satellites,
     )
 
-    formatted = json.dumps(body, ensure_ascii=False, separators=(",", ":"))
+    formatted = json.dumps(body, ensure_ascii=False, indent=2)
+    output_path: Path | None = None
     if args.out:
-        output_path = Path(args.out)
+        output_path = Path(args.out).resolve()
+    elif args.post_url:
+        output_path = PROJECT_DIR / "tmp" / "links.json"
+
+    if output_path:
         output_path.parent.mkdir(parents=True, exist_ok=True)
-        output_path.write_text(formatted, encoding="utf-8")
-        print(f"Wrote {args.out}")
+        with output_path.open("w", encoding="utf-8", newline="\n") as output_file:
+            output_file.write(formatted)
+            output_file.write("\n")
+        print(f"Wrote {output_path}")
     else:
         print(formatted)
 
     if args.post_url:
-        post_json(args.post_url, body)
+        if output_path is None:
+            raise RuntimeError("An output path is required when posting links.")
+        try:
+            request_path = output_path.relative_to(PROJECT_DIR).as_posix()
+        except ValueError as error:
+            raise ValueError("The posted links file must be inside satellite-emulator/tmp.") from error
+        if not request_path.startswith("tmp/"):
+            raise ValueError("The posted links file must be inside satellite-emulator/tmp.")
+        post_json(args.post_url, {"path": request_path})
 
     return 0
 

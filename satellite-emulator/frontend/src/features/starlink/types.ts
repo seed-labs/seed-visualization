@@ -48,12 +48,6 @@ export type InterSatelliteLink = {
   satelliteBId: string;
 };
 
-export type SatelliteLinksRequest = {
-  interval: string;
-  satelliteLinks: InterSatelliteLink[][];
-  timestamp: string;
-};
-
 export type SatelliteLinkFrame = {
   links: InterSatelliteLink[];
   sampleTime: Date;
@@ -63,13 +57,18 @@ export type SatelliteLinkFrame = {
 };
 
 export type GroundLinkState = {
-  groundStationId?: string;
-  satelliteId?: string;
+  groundStationId: string;
+  satelliteId: string;
 };
 
-export type GroundLinksRequest = {
+export type LinkUpdateState = {
+  groundLinks: GroundLinkState[];
+  satelliteLinks: InterSatelliteLink[];
+};
+
+export type LinksRequest = {
   interval: string;
-  groundLinks: GroundLinkState[][];
+  links: LinkUpdateState[];
   timestamp: string;
 };
 

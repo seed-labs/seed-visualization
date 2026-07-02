@@ -1,22 +1,20 @@
 import WebSocket from 'ws';
 import express from 'express';
+import {promises as fs} from 'fs';
+import path from 'path';
 
 let satelliteLinkSubscribers: WebSocket[] = [];
 const router = express.Router();
 const linksJsonParser = express.json({
-    limit: process.env.GROUND_LINKS_BODY_LIMIT || '100mb',
+    limit: '10kb',
 });
+const projectDirectory = path.resolve(__dirname, '../../../../..');
+const linksDirectory = path.join(projectDirectory, 'tmp');
+const defaultLinksPath = path.join(linksDirectory, 'links.json');
 
 interface GroundLink {
-    groundStationId?: string;
-    satelliteId?: string;
-}
-
-
-interface GroundLinksRequest {
-    interval: string,
-    groundLinks: GroundLink[][],
-    timestamp: string
+    groundStationId: string;
+    satelliteId: string;
 }
 
 interface SatelliteLink {
@@ -24,9 +22,14 @@ interface SatelliteLink {
     satelliteBId: string;
 }
 
-interface SatelliteLinksRequest {
+interface LinkUpdate {
+    groundLinks: GroundLink[];
+    satelliteLinks: SatelliteLink[];
+}
+
+interface LinksRequest {
     interval: string;
-    satelliteLinks: SatelliteLink[][];
+    links: LinkUpdate[];
     timestamp: string;
 }
 
@@ -35,20 +38,8 @@ function isGroundLink(value: unknown): value is GroundLink {
 
     return Boolean(
         link &&
-        (link.groundStationId === undefined || typeof link.groundStationId === 'string') &&
-        (link.satelliteId === undefined || typeof link.satelliteId === 'string')
-    );
-}
-
-function isGroundLinksRequest(value: unknown): value is GroundLinksRequest {
-    const body = value as GroundLinksRequest;
-
-    return Boolean(
-        body &&
-        typeof body.interval === 'string' &&
-        typeof body.timestamp === 'string' &&
-        Array.isArray(body.groundLinks) &&
-        body.groundLinks.every((links) => Array.isArray(links) && links.every(isGroundLink))
+        typeof link.groundStationId === 'string' &&
+        typeof link.satelliteId === 'string'
     );
 }
 
@@ -62,30 +53,40 @@ function isSatelliteLink(value: unknown): value is SatelliteLink {
     );
 }
 
-function isSatelliteLinksRequest(value: unknown): value is SatelliteLinksRequest {
-    const body = value as SatelliteLinksRequest;
+function isLinkUpdate(value: unknown): value is LinkUpdate {
+    const update = value as LinkUpdate;
+
+    return Boolean(
+        update &&
+        Array.isArray(update.groundLinks) &&
+        update.groundLinks.every(isGroundLink) &&
+        Array.isArray(update.satelliteLinks) &&
+        update.satelliteLinks.every(isSatelliteLink)
+    );
+}
+
+function isLinksRequest(value: unknown): value is LinksRequest {
+    const body = value as LinksRequest;
 
     return Boolean(
         body &&
         typeof body.interval === 'string' &&
         typeof body.timestamp === 'string' &&
-        Array.isArray(body.satelliteLinks) &&
-        body.satelliteLinks.every((links) => Array.isArray(links) && links.every(isSatelliteLink))
+        Array.isArray(body.links) &&
+        body.links.every(isLinkUpdate)
     );
 }
 
-function broadcastLinks(
-    type: 'SATELLITE_GROUND_LINKS' | 'SATELLITE_LINKS',
-    result: GroundLinksRequest | GroundLinksRequest[] | SatelliteLinksRequest | SatelliteLinksRequest[]
-) {
+function broadcastLinks(result: LinksRequest | LinksRequest[]) {
     let deadSockets: WebSocket[] = [];
+    const message = JSON.stringify({
+        type: 'SATELLITE_LINK_UPDATES',
+        result,
+    });
 
     satelliteLinkSubscribers.forEach((socket: WebSocket) => {
         if (socket.readyState === WebSocket.OPEN) {
-            socket.send(JSON.stringify({
-                type,
-                result,
-            }));
+            socket.send(message);
         }
 
         if (socket.readyState > WebSocket.OPEN) {
@@ -101,42 +102,86 @@ function broadcastLinks(
     });
 }
 
-router.post('/ground-links', linksJsonParser, async function (req, res) {
-    const body = req.body;
+function resolveLinksPath(requestedPath: unknown): string | undefined {
+    if (requestedPath === undefined) {
+        return defaultLinksPath;
+    }
 
-    if (!isGroundLinksRequest(body) && (!Array.isArray(body) || !body.every(isGroundLinksRequest))) {
+    if (typeof requestedPath !== 'string' || requestedPath.trim().length === 0) {
+        return undefined;
+    }
+
+    const resolvedPath = path.resolve(projectDirectory, requestedPath);
+    const relativePath = path.relative(linksDirectory, resolvedPath);
+    if (relativePath.startsWith('..') || path.isAbsolute(relativePath)) {
+        return undefined;
+    }
+
+    return resolvedPath;
+}
+
+router.post('/links', linksJsonParser, async function (req, res) {
+    const requestBody = req.body;
+    if (
+        requestBody !== undefined &&
+        requestBody !== null &&
+        (typeof requestBody !== 'object' || Array.isArray(requestBody))
+    ) {
         res.status(400).json({
             ok: false,
-            result: 'request body must be a GroundLinksRequest or GroundLinksRequest array.'
+            result: 'request body must be an object containing an optional path string.'
         });
         return;
     }
 
-    broadcastLinks('SATELLITE_GROUND_LINKS', body);
-
-    res.json({
-        ok: true,
-    });
-
-});
-
-router.post('/satellite-links', linksJsonParser, async function (req, res) {
-    const body = req.body;
-
-    if (!isSatelliteLinksRequest(body) && (!Array.isArray(body) || !body.every(isSatelliteLinksRequest))) {
+    const linksPath = resolveLinksPath(requestBody?.path);
+    if (!linksPath) {
         res.status(400).json({
             ok: false,
-            result: 'request body must be a SatelliteLinksRequest or SatelliteLinksRequest array.'
+            result: 'path must reference a JSON file inside the satellite-emulator/tmp directory.'
         });
         return;
     }
 
-    broadcastLinks('SATELLITE_LINKS', body);
+    let source: string;
+    try {
+        source = await fs.readFile(linksPath, 'utf8');
+    } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+            res.status(404).json({
+                ok: false,
+                result: `links file not found: ${linksPath}`
+            });
+            return;
+        }
+        throw error;
+    }
+
+    let body: unknown;
+    try {
+        body = JSON.parse(source);
+    } catch {
+        res.status(400).json({
+            ok: false,
+            result: `links file is not valid JSON: ${linksPath}`
+        });
+        return;
+    }
+
+    if (!isLinksRequest(body) && (!Array.isArray(body) || !body.every(isLinksRequest))) {
+        res.status(400).json({
+            ok: false,
+            result: 'links file must contain a LinksRequest or LinksRequest array.'
+        });
+        return;
+    }
+
+    broadcastLinks(body);
 
     res.json({
         ok: true,
+        path: linksPath,
     });
-
 });
 
 export function registerWebSocketRoutes() {

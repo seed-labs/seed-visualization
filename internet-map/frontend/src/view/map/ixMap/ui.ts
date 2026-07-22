@@ -20,7 +20,7 @@ export class MapUi extends BaseMapUi {
     private _ixNumber: Ref<number>;
     private _ixNumberMax: Ref<number>;
     private _ixOptions: Ref<any>;
-    protected _datasource: DataSource;
+    declare protected _datasource: DataSource;
 
     /**
      * Build a new map UI controller.
@@ -75,7 +75,7 @@ export class MapUi extends BaseMapUi {
     }
 
     _updateMap(vertices: Vertex[], edges: Edge[]) {
-        const {_nodes, _edges, _graph} = this.getter();
+        const {_nodes, _edges} = this.getter();
         this.allLoadingInstance = allLoading()
         try {
             vertices.filter(item => !_nodes.get(item.id)).forEach((item: Vertex) => {

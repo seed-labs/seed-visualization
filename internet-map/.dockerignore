@@ -1,4 +1,7 @@
-**/node_modules/
-example
-docs
-*.md
+backend/node_modules/
+backend/bin/
+frontend/node_modules/
+frontend/dist/
+frontend/test-results/
+frontend/playwright-report/
+npm-debug.log*

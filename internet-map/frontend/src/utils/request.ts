@@ -1,24 +1,35 @@
-import axios from "axios"
+import axios, { type AxiosError, type AxiosInstance } from 'axios';
 import {ElMessage} from "element-plus"
 
+function createRequest(baseURL: string, timeout: number): AxiosInstance {
+  const request = axios.create({
+    baseURL,
+    timeout,
+  });
 
-let request = axios.create({
-    baseURL: import.meta.env.VITE_SERVER_URL_PREFIX,
-    timeout: import.meta.env.VITE_SERVER_TIMEOUT,
-})
+  request.interceptors.request.use((config: any) => {return config})
 
-request.interceptors.request.use((config: any) => {
-    return config
-})
-
-request.interceptors.response.use((response: any) => {
-    return response.data
-}, (error: any) => {
-    ElMessage({
+  request.interceptors.response.use(
+    (response) => response.data,
+    (error: AxiosError) => {
+      const message = error.message || 'Request failed';
+      ElMessage({
         type: 'error',
-        message: error,
-    })
-    return Promise.reject(error)
-})
+        message,
+      });
 
-export default request
+      return Promise.reject(error);
+    },
+  );
+
+  return request;
+}
+
+export const request = createRequest(import.meta.env.VITE_SERVER_URL_PREFIX, import.meta.env.VITE_SERVER_TIMEOUT);
+
+export const emulatorRequest = createRequest(
+  import.meta.env.VITE_SERVER_EMULATOR_URL_PREFIX,
+  import.meta.env.VITE_SERVER_TIMEOUT,
+);
+
+export default emulatorRequest

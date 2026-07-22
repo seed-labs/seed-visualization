@@ -1,0 +1,6 @@
+export const TIMELINE_WINDOW_MS = 50 * 60 * 1000;
+export const TIMELINE_SHIFT_MS = 10 * 60 * 1000;
+export const TIMELINE_TICK_MS = 5 * 60 * 1000;
+export const TIMELINE_MARKER_MIN_GAP_PERCENT = 1;
+export const TIMELINE_LABEL_MIN_GAP_PERCENT = 9;
+export const TIMELINE_LABEL_LANE_COUNT = 3;

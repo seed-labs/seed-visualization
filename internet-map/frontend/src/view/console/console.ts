@@ -10,7 +10,8 @@ export async function initConsole(id: string, term: Terminal, cmd:string = '') {
     try {
         container = (await net.getContainer()).result;
     } catch (e) {
-        term.write(`error: ${e.result}\r\n`);
+        const message = typeof e === 'object' && e && 'result' in e ? String(e.result) : String(e);
+        term.write(`error: ${message}\r\n`);
         return;
     }
 
@@ -34,7 +35,7 @@ export async function initConsole(id: string, term: Terminal, cmd:string = '') {
         text: node.role
     });
 
-    node.nets.forEach(net => {
+    node.nets.forEach((net: {name: string; address: string}) => {
         info.push({
             label: 'IP',
             text: `${net.name},${net.address}`

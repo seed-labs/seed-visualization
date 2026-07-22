@@ -24,6 +24,7 @@ const pageParams2 = reactive({
 const state = reactive({
   keyword: '',
   loading: false,
+  errorMessage: '',
   allContainerTableData: [] as any[],
   allNetTableData: [] as any[],
   containerTableData: [] as any[],
@@ -62,6 +63,15 @@ const onKill = async (row: {}) => {
 const onDownload = () => {
   console.log('download')
 }
+let pendingRequests = 0
+const beginLoading = () => {
+  pendingRequests += 1
+  state.loading = true
+}
+const endLoading = () => {
+  pendingRequests = Math.max(0, pendingRequests - 1)
+  state.loading = pendingRequests > 0
+}
 const setPageData1 = () => {
   const start = (pageParams1.currentPage - 1) * pageParams1.pageSize
   const end = pageParams1.currentPage * pageParams1.pageSize
@@ -74,7 +84,8 @@ const setPageData2 = () => {
   state.netTableData = state.allNetTableData.slice(start, end)
 }
 const getContainerTableData = async (params: {} = {}) => {
-  state.loading = true
+  beginLoading()
+  state.errorMessage = ''
   try {
     const res = await reqGetContainersList(params)
     if (!res.ok) {
@@ -85,17 +96,19 @@ const getContainerTableData = async (params: {} = {}) => {
     setPageData1()
   } catch (e) {
     const errMsg = e instanceof Error ? e.message : String(e)
+    state.errorMessage = errMsg
     ElNotification({
       type: 'error',
       message: errMsg
     } as any)
   } finally {
-    state.loading = false
+    endLoading()
   }
 }
 
 const getNetworkTableData = async (params: {} = {}) => {
-  state.loading = true
+  beginLoading()
+  state.errorMessage = ''
   try {
     const res = await reqGetNetworksList(params)
     if (!res.ok) {
@@ -106,12 +119,13 @@ const getNetworkTableData = async (params: {} = {}) => {
     setPageData2()
   } catch (e) {
     const errMsg = e instanceof Error ? e.message : String(e)
+    state.errorMessage = errMsg
     ElNotification({
       type: 'error',
       message: errMsg
     } as any)
   } finally {
-    state.loading = false
+    endLoading()
   }
 }
 
@@ -123,7 +137,15 @@ onMounted(() => {
 
 <template>
   <el-row justify="center">
-    <el-col :span="23">
+    <el-col :span="23" data-testid="dashboard-page">
+      <p v-if="state.loading" data-testid="dashboard-loading">loading...</p>
+      <p v-else-if="state.errorMessage" data-testid="dashboard-error">{{ state.errorMessage }}</p>
+      <p
+          v-else-if="state.allContainerTableData.length === 0 && state.allNetTableData.length === 0"
+          data-testid="dashboard-empty"
+      >
+        No emulator data.
+      </p>
       <el-card>
         <template #header>
           <div class="card-header">

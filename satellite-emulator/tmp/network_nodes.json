@@ -1,0 +1,44 @@
+[
+  {
+    "id": "host-los-angeles",
+    "type": "host",
+    "name": "Client Host - Los Angeles",
+    "longitude": -118.2437,
+    "latitude": 34.0522
+  },
+  {
+    "id": "router-los-angeles",
+    "type": "router",
+    "name": "Edge Router - Los Angeles",
+    "longitude": -118.2551,
+    "latitude": 34.0489
+  },
+  {
+    "id": "host-ashburn",
+    "type": "host",
+    "name": "Service Host - Ashburn",
+    "longitude": -77.4874,
+    "latitude": 39.0438
+  },
+  {
+    "id": "router-ashburn",
+    "type": "router",
+    "name": "Core Router - Ashburn",
+    "longitude": -77.4649,
+    "latitude": 39.0157
+  },
+  {
+    "id": "host-sao-paulo",
+    "type": "host",
+    "name": "Client Host - Sao Paulo",
+    "longitude": -46.6333,
+    "latitude": -23.5505
+  },
+  {
+    "id": "router-sao-paulo",
+    "type": "router",
+    "name": "Edge Router - Sao Paulo",
+    "longitude": -46.645,
+    "latitude": -23.556
+  }
+]

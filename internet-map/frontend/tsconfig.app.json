@@ -17,7 +17,7 @@
         "src/*"
       ]
     },
-    "types": ["node", "vite/client"],
+    "types": ["node", "vite/client", "vitest/globals"],
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.vue"]
+  "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.vue", "tests/**/*.ts"]
 }

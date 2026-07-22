@@ -1,0 +1,205 @@
+{
+  "timestamp": "1782977606177",
+  "interval": "3s",
+  "type": "network",
+  "links": [
+    {
+      "id": "flow-los-angeles-ashburn-001",
+      "forwardPath": [
+        {
+          "id": "host-los-angeles",
+          "type": "host",
+          "latencyMs": 0.4,
+          "packetLoss": 0.0001
+        },
+        {
+          "id": "router-los-angeles",
+          "type": "router",
+          "latencyMs": 0.8,
+          "packetLoss": 0.0002
+        },
+        {
+          "id": "starlink-gs-0124-los-angeles-ca",
+          "type": "groundStation",
+          "latencyMs": 8.6,
+          "packetLoss": 0.001
+        },
+        {
+          "id": "910001",
+          "type": "satellite",
+          "latencyMs": 14.2,
+          "packetLoss": 0.0015
+        },
+        {
+          "id": "910004",
+          "type": "satellite",
+          "latencyMs": 9.1,
+          "packetLoss": 0.0011
+        },
+        {
+          "id": "starlink-gs-0007-ashburn-va",
+          "type": "groundStation",
+          "latencyMs": 0.7,
+          "packetLoss": 0.0002
+        },
+        {
+          "id": "router-ashburn",
+          "type": "router",
+          "latencyMs": 0.3,
+          "packetLoss": 0.0001
+        },
+        {
+          "id": "host-ashburn",
+          "type": "host"
+        }
+      ],
+      "returnPath": [
+        {
+          "id": "host-ashburn",
+          "type": "host",
+          "latencyMs": 0.3,
+          "packetLoss": 0.0001
+        },
+        {
+          "id": "router-ashburn",
+          "type": "router",
+          "latencyMs": 0.7,
+          "packetLoss": 0.0002
+        },
+        {
+          "id": "starlink-gs-0007-ashburn-va",
+          "type": "groundStation",
+          "latencyMs": 9.3,
+          "packetLoss": 0.001
+        },
+        {
+          "id": "910004",
+          "type": "satellite",
+          "latencyMs": 14.4,
+          "packetLoss": 0.0014
+        },
+        {
+          "id": "910001",
+          "type": "satellite",
+          "latencyMs": 8.4,
+          "packetLoss": 0.0012
+        },
+        {
+          "id": "starlink-gs-0124-los-angeles-ca",
+          "type": "groundStation",
+          "latencyMs": 0.8,
+          "packetLoss": 0.0002
+        },
+        {
+          "id": "router-los-angeles",
+          "type": "router",
+          "latencyMs": 0.4,
+          "packetLoss": 0.0001
+        },
+        {
+          "id": "host-los-angeles",
+          "type": "host"
+        }
+      ]
+    },
+    {
+      "id": "flow-sao-paulo-ashburn-002",
+      "forwardPath": [
+        {
+          "id": "host-sao-paulo",
+          "type": "host",
+          "latencyMs": 0.5,
+          "packetLoss": 0.0002
+        },
+        {
+          "id": "router-sao-paulo",
+          "type": "router",
+          "latencyMs": 1.1,
+          "packetLoss": 0.0004
+        },
+        {
+          "id": "starlink-gs-0148-mossor-brazil",
+          "type": "groundStation",
+          "latencyMs": 10.7,
+          "packetLoss": 0.0016
+        },
+        {
+          "id": "940202",
+          "type": "satellite",
+          "latencyMs": 16.3,
+          "packetLoss": 0.002
+        },
+        {
+          "id": "940057",
+          "type": "satellite",
+          "latencyMs": 11.8,
+          "packetLoss": 0.0015
+        },
+        {
+          "id": "starlink-gs-0007-ashburn-va",
+          "type": "groundStation",
+          "latencyMs": 0.7,
+          "packetLoss": 0.0002
+        },
+        {
+          "id": "router-ashburn",
+          "type": "router",
+          "latencyMs": 0.3,
+          "packetLoss": 0.0001
+        },
+        {
+          "id": "host-ashburn",
+          "type": "host"
+        }
+      ],
+      "returnPath": [
+        {
+          "id": "host-ashburn",
+          "type": "host",
+          "latencyMs": 0.3,
+          "packetLoss": 0.0001
+        },
+        {
+          "id": "router-ashburn",
+          "type": "router",
+          "latencyMs": 0.7,
+          "packetLoss": 0.0002
+        },
+        {
+          "id": "starlink-gs-0007-ashburn-va",
+          "type": "groundStation",
+          "latencyMs": 11.6,
+          "packetLoss": 0.0015
+        },
+        {
+          "id": "940057",
+          "type": "satellite",
+          "latencyMs": 16.1,
+          "packetLoss": 0.0021
+        },
+        {
+          "id": "940202",
+          "type": "satellite",
+          "latencyMs": 10.9,
+          "packetLoss": 0.0016
+        },
+        {
+          "id": "starlink-gs-0148-mossor-brazil",
+          "type": "groundStation",
+          "latencyMs": 1.1,
+          "packetLoss": 0.0004
+        },
+        {
+          "id": "router-sao-paulo",
+          "type": "router",
+          "latencyMs": 0.5,
+          "packetLoss": 0.0002
+        },
+        {
+          "id": "host-sao-paulo",
+          "type": "host"
+        }
+      ]
+    }
+  ]
+}

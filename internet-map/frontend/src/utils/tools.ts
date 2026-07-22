@@ -57,7 +57,7 @@ export const findRouteWithParents = (path: string, routes: RouteRecord[]): Route
     return result
 }
 
-const proxyAddress = import.meta.env.MODE === 'development' ? import.meta.env.VITE_PROXY_ADDRESS : location.host
+const proxyAddress = import.meta.env.MODE === 'development' ? import.meta.env.VITE_PROXY_EMULATOR_ADDRESS : location.host
 export const getImgUrl = (path: string | undefined) => {
     if (!path || import.meta.env.MODE !== "development") {
         return ''
@@ -77,7 +77,7 @@ export const allLoading = () => {
     })
 }
 export const getSocket = (protocol: string = 'ws', uri: string = '/host'): WebSocket => {
-    const host = import.meta.env.MODE === 'development' ? import.meta.env.VITE_PROXY_ADDRESS.replace(/^https?:\/\//, '') : location.host
+    const host = import.meta.env.MODE === 'development' ? import.meta.env.VITE_PROXY_EMULATOR_ADDRESS.replace(/^https?:\/\//, '') : location.host
     return new WebSocket(`${protocol}://${host}${import.meta.env.VITE_SERVER_URL_PREFIX}${uri}`);
 }
 
@@ -160,8 +160,8 @@ export function genVisData(composeData: ComposeData, projectName = "demo_output"
                 scope: labels[`${META_PREFIX}scope`] || '',
                 type: labels[`${META_PREFIX}type`] || 'local',
                 displayname: labels[`${META_PREFIX}displayname`] || '',
-                longitude: labels[`${META_PREFIX}longitude`] || '',
-                latitude: labels[`${META_PREFIX}latitude`] || '',
+                longitude: labels[`${META_PREFIX}geo.lon`] || '',
+                latitude: labels[`${META_PREFIX}geo.lat`] || '',
             };
 
             const network: EmulatorNetwork = {
@@ -187,7 +187,7 @@ export function genVisData(composeData: ComposeData, projectName = "demo_output"
                 Labels: labels,
                 meta: {
                     emulatorInfo: emulatorInfo,
-                    relation: {parent: {}}
+                    relation: {parent: new Set<string>()}
                 }
             };
 
@@ -363,9 +363,14 @@ export function genVisData(composeData: ComposeData, projectName = "demo_output"
                         nets: netsInfo,
                         asn: Number(labels['org.seedsecuritylabs.seedemu.meta.asn'] || 0),
                         name: nodeName,
-                        role: labels['org.seedsecuritylabs.seedemu.meta.role'] || ''
+                        role: labels['org.seedsecuritylabs.seedemu.meta.role'] || '',
+                        displayname: labels['org.seedsecuritylabs.seedemu.meta.displayname'] || '',
+                        description: labels['org.seedsecuritylabs.seedemu.meta.description'] || '',
+                        custom: labels['org.seedsecuritylabs.seedemu.meta.custom'] || '',
+                        longitude: labels['org.seedsecuritylabs.seedemu.meta.geo.lon'] || '',
+                        latitude: labels['org.seedsecuritylabs.seedemu.meta.geo.lat'] || ''
                     },
-                    relation: {parent: {}}
+                    relation: {parent: new Set<string>()}
                 }
             };
 
@@ -383,13 +388,7 @@ export function genVisData(composeData: ComposeData, projectName = "demo_output"
     }
 
     const [networks, networkNameToId] = createNetworks(composeData, projectName);
-    let count = 0;
-    for (const [netName, netId] of Object.entries(networkNameToId)) {
-        if (count >= 5) break;
-        // console.log(`  ${netName} -> ${netId.substring(0, 16)}...`);
-        count++;
-    }
-    const [nodes, skippedNodes] = createNodes(composeData, networkNameToId, projectName);
+    const [nodes] = createNodes(composeData, networkNameToId, projectName);
 
     // Build final data
     return {

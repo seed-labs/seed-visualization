@@ -23,7 +23,7 @@ export class MapUi extends BaseMapUi {
     private _transitNumberMax: Ref<number>;
     private _transits: Ref<TransitsEmulatorNodeInfo[]>;
     private _transitsCheckedList: Ref<number[]>;
-    protected _datasource: DataSource;
+    declare protected _datasource: DataSource;
 
     /**
      * Build a new map UI controller.
@@ -85,7 +85,7 @@ export class MapUi extends BaseMapUi {
 
     _updateTransitMap(vertices: Vertex[], edges: Edge[]) {
         this.allLoadingInstance = allLoading()
-        const {_nodes, _edges, _graph} = this.getter();
+        const {_nodes, _edges} = this.getter();
         try {
             vertices.filter(item => !_nodes.get(item.id)).forEach((item: Vertex) => {
                 _nodes.add(item)

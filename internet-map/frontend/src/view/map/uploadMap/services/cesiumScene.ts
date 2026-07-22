@@ -1,4 +1,5 @@
 import {
+  BillboardCollection,
   Cartesian2,
   Cartesian3,
   Color,
@@ -28,8 +29,8 @@ const EARTH_TILE_CREDIT = 'satellitemap.space'
 const EARTH_TILE_MINIMUM_LEVEL = 2
 const EARTH_TILE_MAXIMUM_LEVEL = 7
 const EARTH_TILE_SIZE = 512
-const STAR_COLOR = Color.fromCssColorString('#58c7ff')
-const STAR_OUTLINE_COLOR = Color.fromCssColorString('#d6f5ff')
+const STAR_COLOR = Color.fromCssColorString('#ffcc33')
+const STAR_OUTLINE_COLOR = Color.fromCssColorString('#ff4a2a')
 const DOT_COLOR = Color.fromCssColorString('#2388d9')
 const DOT_OUTLINE_COLOR = Color.fromCssColorString('#9bdcff')
 const NODE_COLOR = Color.fromCssColorString('#7de8ff')
@@ -38,8 +39,11 @@ const HIGHLIGHT_OUTLINE_COLOR = Color.fromCssColorString('#f0ddff')
 const LINE_COLOR = Color.fromCssColorString('#3bb8ff').withAlpha(0.48)
 const HIGHLIGHT_LINE_COLOR = Color.fromCssColorString('#a56bff').withAlpha(0.86)
 const SURFACE_CURVE_LINE_COLOR = Color.fromCssColorString('#ff4a2a').withAlpha(0.88)
+const INTERNAL_ROUTER_LINE_COLOR = Color.fromCssColorString('#38d996').withAlpha(0.72)
 const GRID_COLOR = Color.fromCssColorString('#6ee7ff').withAlpha(0.16)
+const STAR_IMAGE_SIZE = 128
 const LINK_SPREAD_MULTIPLIER = 1.35
+const SAME_PARENT_CURVE_HEIGHT = 230_000
 const SURFACE_CURVE_HEIGHT = 45_000
 const SURFACE_CURVE_SEGMENTS = 56
 const MAX_AVOIDANCE_SEGMENTS = 220
@@ -58,10 +62,16 @@ type RenderSegment = {
 
 export type UploadMap3DSceneApi = {
   viewer: Viewer
-  renderGraph: (graph: GlobeGraph, nodeScale?: number, showRouterNodes?: boolean) => void
+  renderGraph: (graph: GlobeGraph, options?: UploadMap3DRenderOptions) => void
   orientToGraph: (graph: GlobeGraph) => void
   onNodeClick: (handler: (node: GlobeNode) => void) => void
   destroy: () => void
+}
+
+export type UploadMap3DRenderOptions = {
+  nodeScale?: number
+  showRouterLabels?: boolean
+  expandedRouterParentIds?: string[]
 }
 
 function createColorMaterial(color: Color) {
@@ -111,10 +121,15 @@ function getNodeColor(node: GlobeNode) {
   return NODE_COLOR
 }
 
+function getNodeFillColor(node: GlobeNode) {
+  if (node.kind === 'dot' && node.highlighted) return Color.TRANSPARENT
+  return getNodeColor(node)
+}
+
 function getNodeSize(node: GlobeNode) {
-  if (node.highlighted) return 14
-  if (node.kind === 'star') return 15
-  if (node.kind === 'dot') return 9
+  if (node.kind === 'star') return 14
+  if (node.kind === 'dot') return node.highlighted ? 2.4 : 4.5
+  if (node.highlighted) return 7
   return 7.5
 }
 
@@ -127,9 +142,9 @@ function getNodeOutlineColor(node: GlobeNode) {
 
 function getNodeOutlineWidth(node: GlobeNode, nodeScale: number) {
   const scale = Math.min(nodeScale, 2.5)
-  if (node.highlighted) return 3.2 * scale
-  if (node.kind === 'star') return 2.4 * scale
-  if (node.kind === 'dot') return 1.8 * scale
+  if (node.kind === 'star') return 1.4 * scale
+  if (node.kind === 'dot') return (node.highlighted ? 1.6 : 1.1) * scale
+  if (node.highlighted) return 2 * scale
   return 1.1 * scale
 }
 
@@ -157,8 +172,9 @@ function getEdgeMaterial(from: GlobeNode, to: GlobeNode) {
   return createColorMaterial(from.highlighted && to.highlighted ? HIGHLIGHT_LINE_COLOR : LINE_COLOR)
 }
 
-function getRenderEdgeMaterial(edge: { surfaceCurve?: boolean }, from: GlobeNode, to: GlobeNode) {
-  return edge.surfaceCurve
+function getRenderEdgeMaterial(edge: { surfaceCurve?: boolean; keepLineColor?: boolean; internalRouterLink?: boolean }, from: GlobeNode, to: GlobeNode) {
+  if (edge.internalRouterLink) return createColorMaterial(INTERNAL_ROUTER_LINE_COLOR)
+  return edge.surfaceCurve && !edge.keepLineColor
     ? createColorMaterial(SURFACE_CURVE_LINE_COLOR)
     : getEdgeMaterial(from, to)
 }
@@ -241,6 +257,28 @@ function getSurfaceCurvePositions(from: GeoPoint, to: GeoPoint) {
   }
 
   return positions
+}
+
+function getSameParentCurvePositions(from: GlobeNode, to: GlobeNode, renderGeos: Map<string, GeoPoint>, nodeScale: number) {
+  const fromPoint = getRenderGeoPoint(from, renderGeos)
+  const toPoint = getRenderGeoPoint(to, renderGeos)
+  const midLat = (fromPoint.lat + toPoint.lat) / 2
+  const midLon = normalizeLongitude(fromPoint.lon + getLongitudeDelta(fromPoint.lon, toPoint.lon) / 2)
+  const dx = getLongitudeDelta(fromPoint.lon, toPoint.lon) * getLonScale(midLat)
+  const dy = toPoint.lat - fromPoint.lat
+  const length = Math.max(Math.hypot(dx, dy), 0.001)
+  const offset = Math.max(0.34, Math.min(0.9, length * 0.32))
+  const side = from.id < to.id ? 1 : -1
+  const control = {
+    lat: clampLatitude(midLat + (dx / length) * offset * side),
+    lon: normalizeLongitude(midLon - (dy / length) * offset * side / getLonScale(midLat)),
+  }
+
+  return [
+    getRenderPosition(from, renderGeos, nodeScale),
+    Cartesian3.fromDegrees(control.lon, control.lat, SAME_PARENT_CURVE_HEIGHT + getRenderHeight(from, nodeScale)),
+    getRenderPosition(to, renderGeos, nodeScale),
+  ]
 }
 
 function getLongitudeDelta(from: number, to: number) {
@@ -395,10 +433,10 @@ function chooseAvoidedPoint(
   placedSegments: RenderSegment[],
   placedPoints: GeoPoint[],
   spreadScale: number,
-) {
+): GeoPoint {
   const localSegments = getLocalSegments(parentPoint, placedSegments)
   const localPoints = getLocalPoints(parentPoint, placedPoints)
-  let bestPoint = candidates[0]
+  let bestPoint = candidates[0]!
   let bestScore = Number.POSITIVE_INFINITY
 
   candidates.forEach((candidate) => {
@@ -426,7 +464,23 @@ function getAvoidedRenderGeos(renderNodes: GlobeNode[], nodeById: Map<string, Gl
   })
 
   renderNodes
-    .filter((node) => node.parentId && nodeById.has(node.parentId))
+    .filter((node) => node.parentId && node.hasExplicitGeo)
+    .forEach((node) => {
+      const point = { lat: node.lat, lon: node.lon }
+      const parent = nodeById.get(node.parentId!)
+      const parentPoint = parent
+        ? renderGeos.get(parent.id) ?? { lat: parent.lat, lon: parent.lon }
+        : undefined
+
+      renderGeos.set(node.id, point)
+      placedPoints.push(point)
+      if (parentPoint) {
+        placedSegments.push({ from: parentPoint, to: point })
+      }
+    })
+
+  renderNodes
+    .filter((node) => node.parentId && !node.hasExplicitGeo && nodeById.has(node.parentId))
     .forEach((node) => {
       const parent = nodeById.get(node.parentId!)
       if (!parent) return
@@ -461,6 +515,53 @@ function getFrontNode(graph: GlobeGraph) {
     ?? graph.nodes.find((node) => node.hasExplicitGeo)
     ?? graph.nodes.find((node) => node.kind === 'star')
     ?? graph.nodes[0]
+}
+
+function createStarImage(fillColor: string, outlineColor: string) {
+  const canvas = document.createElement('canvas')
+  canvas.width = STAR_IMAGE_SIZE
+  canvas.height = STAR_IMAGE_SIZE
+  const context = canvas.getContext('2d')
+  if (!context) return canvas
+
+  const center = STAR_IMAGE_SIZE / 2
+  const outerRadius = STAR_IMAGE_SIZE * 0.42
+  const innerRadius = STAR_IMAGE_SIZE * 0.18
+
+  context.beginPath()
+  for (let index = 0; index < 10; index += 1) {
+    const radius = index % 2 === 0 ? outerRadius : innerRadius
+    const angle = -Math.PI / 2 + (Math.PI * index) / 5
+    const x = center + Math.cos(angle) * radius
+    const y = center + Math.sin(angle) * radius
+    if (index === 0) {
+      context.moveTo(x, y)
+    } else {
+      context.lineTo(x, y)
+    }
+  }
+  context.closePath()
+  context.fillStyle = fillColor
+  context.strokeStyle = outlineColor
+  context.lineWidth = 8
+  context.shadowColor = fillColor
+  context.shadowBlur = 18
+  context.fill()
+  context.shadowBlur = 0
+  context.stroke()
+
+  return canvas
+}
+
+function shouldRenderRouterNode(node: GlobeNode, expandedRouterParentIds: Set<string>) {
+  if (node.kind !== 'dot') return true
+  if (node.highlighted) return true
+  return Boolean(node.isIxRouter && node.parentId && expandedRouterParentIds.has(node.parentId))
+}
+
+function shouldRenderLabel(node: GlobeNode, showRouterLabels: boolean) {
+  if (node.kind !== 'dot') return true
+  return showRouterLabels
 }
 
 export function createUploadMap3DScene(container: HTMLElement): UploadMap3DSceneApi {
@@ -526,9 +627,16 @@ export function createUploadMap3DScene(container: HTMLElement): UploadMap3DScene
   const gridLines = viewer.scene.primitives.add(new PolylineCollection())
   addReferenceGrid(gridLines)
 
-  const points = viewer.scene.primitives.add(new PointPrimitiveCollection())
-  const labels = viewer.scene.primitives.add(new LabelCollection())
   const lines = viewer.scene.primitives.add(new PolylineCollection())
+  const points = viewer.scene.primitives.add(new PointPrimitiveCollection())
+  const billboards = viewer.scene.primitives.add(new BillboardCollection())
+  const labels = viewer.scene.primitives.add(new LabelCollection())
+  const starImage = createStarImage('#ffcc33', '#ff4a2a')
+  const highlightedStarImage = createStarImage('#ff5a3d', '#ffe066')
+  const hoveredStarImage = createStarImage('#ffe066', '#ff1f1f')
+  const starBillboards = new Map<string, any>()
+  const starNodes = new Map<string, GlobeNode>()
+  let hoveredStarId: string | undefined
   let nodeClickHandler: ((node: GlobeNode) => void) | undefined
 
   viewer.camera.setView({
@@ -540,16 +648,21 @@ export function createUploadMap3DScene(container: HTMLElement): UploadMap3DScene
     },
   })
 
-  function renderGraph(graph: GlobeGraph, nodeScale = 2, showRouterNodes = true) {
+  function renderGraph(graph: GlobeGraph, options: UploadMap3DRenderOptions = {}) {
     points.removeAll()
+    billboards.removeAll()
     labels.removeAll()
     lines.removeAll()
+    starBillboards.clear()
+    starNodes.clear()
+    hoveredStarId = undefined
 
+    const nodeScale = options.nodeScale ?? 2
+    const showRouterLabels = options.showRouterLabels ?? true
+    const expandedRouterParentIds = new Set(options.expandedRouterParentIds ?? [])
     const pointScale = clampNodeScale(nodeScale)
     const spreadScale = pointScale * LINK_SPREAD_MULTIPLIER
-    const renderNodes = showRouterNodes
-      ? graph.nodes
-      : graph.nodes.filter((node) => node.kind !== 'dot')
+    const renderNodes = graph.nodes.filter((node) => shouldRenderRouterNode(node, expandedRouterParentIds))
 
     const nodeById = new Map(renderNodes.map((node) => [node.id, node]))
     const renderGeos = getAvoidedRenderGeos(renderNodes, nodeById, spreadScale)
@@ -559,7 +672,10 @@ export function createUploadMap3DScene(container: HTMLElement): UploadMap3DScene
       const to = nodeById.get(edge.to)
       if (!from || !to) return
 
-      const positions = edge.surfaceCurve
+      const sameParentRouterEdge = !edge.internalRouterLink && from.kind === 'dot' && to.kind === 'dot' && from.parentId && from.parentId === to.parentId
+      const positions = sameParentRouterEdge
+        ? getSameParentCurvePositions(from, to, renderGeos, pointScale)
+        : edge.surfaceCurve
         ? getSurfaceCurvePositions(getRenderGeoPoint(from, renderGeos), getRenderGeoPoint(to, renderGeos))
         : [
           getRenderPosition(from, renderGeos, pointScale),
@@ -575,30 +691,80 @@ export function createUploadMap3DScene(container: HTMLElement): UploadMap3DScene
 
     renderNodes.forEach((node) => {
       const position = getRenderPosition(node, renderGeos, pointScale)
-      points.add({
-        id: node,
-        position,
-        pixelSize: getNodeSize(node) * pointScale,
-        color: getNodeColor(node),
-        outlineColor: getNodeOutlineColor(node),
-        outlineWidth: getNodeOutlineWidth(node, pointScale),
-        scaleByDistance: new NearFarScalar(1_500_000, node.highlighted ? 1.5 : 1.25, 18_000_000, node.highlighted ? 0.72 : 0.58),
-      })
+      if (node.kind === 'star') {
+        const billboard = billboards.add({
+          id: node,
+          image: node.highlighted ? highlightedStarImage : starImage,
+          position,
+          width: getNodeSize(node) * pointScale,
+          height: getNodeSize(node) * pointScale,
+          verticalOrigin: VerticalOrigin.CENTER,
+          scaleByDistance: new NearFarScalar(1_500_000, node.highlighted ? 1.35 : 1.18, 18_000_000, node.highlighted ? 0.72 : 0.58),
+        })
+        starBillboards.set(node.id, billboard)
+        starNodes.set(node.id, node)
+      } else {
+        points.add({
+          id: node,
+          position,
+          pixelSize: getNodeSize(node) * pointScale,
+          color: getNodeFillColor(node),
+          outlineColor: getNodeOutlineColor(node),
+          outlineWidth: getNodeOutlineWidth(node, pointScale),
+          scaleByDistance: new NearFarScalar(1_500_000, node.highlighted ? 1.5 : 1.25, 18_000_000, node.highlighted ? 0.72 : 0.58),
+        })
+      }
 
-      labels.add({
-        position,
-        text: node.label,
-        font: getLabelFont(node, pointScale),
-        fillColor: getNodeColor(node),
-        outlineColor: Color.BLACK.withAlpha(0.92),
-        outlineWidth: node.highlighted ? 5 : 4,
-        style: LabelStyle.FILL_AND_OUTLINE,
-        verticalOrigin: VerticalOrigin.BOTTOM,
-        pixelOffset: getLabelOffset(node, pointScale),
-        heightReference: HeightReference.NONE,
-        scaleByDistance: new NearFarScalar(1_500_000, node.highlighted ? 1.15 : 1, 14_000_000, node.highlighted ? 0.36 : node.kind === 'star' ? 0.35 : 0.18),
-      })
+      if (shouldRenderLabel(node, showRouterLabels)) {
+        labels.add({
+          position,
+          text: node.label,
+          font: getLabelFont(node, pointScale),
+          fillColor: getNodeColor(node),
+          outlineColor: Color.BLACK.withAlpha(0.92),
+          outlineWidth: node.highlighted ? 5 : 4,
+          style: LabelStyle.FILL_AND_OUTLINE,
+          verticalOrigin: VerticalOrigin.BOTTOM,
+          pixelOffset: getLabelOffset(node, pointScale),
+          heightReference: HeightReference.NONE,
+          scaleByDistance: new NearFarScalar(1_500_000, node.highlighted ? 1.15 : 1, 14_000_000, node.highlighted ? 0.36 : node.kind === 'star' ? 0.35 : 0.18),
+        })
+      }
     })
+  }
+
+  function pickGlobeNode(position: Cartesian2) {
+    const pickedObjects = viewer.scene.drillPick(position, 12) as Array<{ id?: GlobeNode }>
+    const pickedNodes = pickedObjects
+      .map((picked) => picked.id)
+      .filter((node): node is GlobeNode => Boolean(node?.id))
+
+    return pickedNodes.find((node) => node.kind === 'star') ?? pickedNodes[0]
+  }
+
+  function setHoveredStar(nextStarId?: string) {
+    if (hoveredStarId === nextStarId) return
+
+    if (hoveredStarId) {
+      const previousBillboard = starBillboards.get(hoveredStarId)
+      const previousNode = starNodes.get(hoveredStarId)
+      if (previousBillboard && previousNode) {
+        previousBillboard.image = previousNode.highlighted ? highlightedStarImage : starImage
+        previousBillboard.scale = 1
+      }
+    }
+
+    hoveredStarId = nextStarId
+
+    if (hoveredStarId) {
+      const billboard = starBillboards.get(hoveredStarId)
+      if (billboard) {
+        billboard.image = hoveredStarImage
+        billboard.scale = 1.42
+      }
+    }
+
+    viewer.canvas.style.cursor = hoveredStarId ? 'pointer' : ''
   }
 
   function orientToGraph(graph: GlobeGraph) {
@@ -621,9 +787,12 @@ export function createUploadMap3DScene(container: HTMLElement): UploadMap3DScene
     orientToGraph,
     onNodeClick(handler: (node: GlobeNode) => void) {
       nodeClickHandler = handler
+      viewer.screenSpaceEventHandler.setInputAction((event: { endPosition: Cartesian2 }) => {
+        const pickedNode = pickGlobeNode(event.endPosition)
+        setHoveredStar(pickedNode?.kind === 'star' ? pickedNode.id : undefined)
+      }, ScreenSpaceEventType.MOUSE_MOVE)
       viewer.screenSpaceEventHandler.setInputAction((event: { position: Cartesian2 }) => {
-        const picked = viewer.scene.pick(event.position)
-        const pickedNode = picked?.id as GlobeNode | undefined
+        const pickedNode = pickGlobeNode(event.position)
         if (!pickedNode?.id) return
         nodeClickHandler?.(pickedNode)
       }, ScreenSpaceEventType.LEFT_DOUBLE_CLICK)

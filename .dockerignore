@@ -1,0 +1,7 @@
+**/node_modules/
+**/dist/
+example
+docs
+*.md
+tests
+.agents

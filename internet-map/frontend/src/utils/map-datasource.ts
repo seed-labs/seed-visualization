@@ -2,7 +2,7 @@ import {DataSet} from 'vis-data';
 import type {FullItem} from 'vis-data/declarations/data-interface';
 import type {EdgeOptions, NodeOptions} from 'vis-network';
 import request from '@/utils/request';
-import type {AxiosRequestConfig, AxiosResponse} from 'axios';
+import type {AxiosRequestConfig} from 'axios';
 import type {
     BgpPeer,
     EmulatorNetwork,
@@ -36,6 +36,9 @@ export interface Edge extends EdgeOptions {
     from: string;
     to: string;
     label?: string;
+    fullLabel?: string;
+    dashed?: boolean;
+    simplified?: boolean;
 }
 
 export type NodesType = DataSet<Vertex, 'id'>
@@ -58,7 +61,7 @@ export class DataSource {
     private _socket!: WebSocket;
     private _socketVis!: WebSocket;
     protected _connected: boolean;
-    private _packetEventHandler!: (nodeId: string) => void;
+    private _packetEventHandler!: (data: any) => void;
     private _errorHandler!: (error: any) => void;
     private _visEventHandler!: (params: any) => void;
 
@@ -91,7 +94,7 @@ export class DataSource {
         method: 'GET' | 'POST' | 'PUT' | 'DELETE',
         url: string,
         body?: any
-    ): Promise<AxiosResponse<ApiRespond<ResultType>>> {
+    ): Promise<ApiRespond<ResultType>> {
         const config: AxiosRequestConfig = {
             method,
             url,
@@ -104,7 +107,7 @@ export class DataSource {
         };
 
         try {
-            const response: AxiosResponse<ApiRespond<ResultType>> = await request(config);
+            const response: ApiRespond<ResultType> = await request(config);
 
             if (response.ok) {
                 return response;
@@ -145,8 +148,9 @@ export class DataSource {
 
         this._nets.forEach((net: EmulatorNetwork) => {
             net.meta.relation = {parent: new Set<string>()}
-            if (META_CLASS in net['Labels'] && net['Labels'][META_CLASS] !== '') {
-                let services = JSON.parse(net['Labels'][META_CLASS]);
+            const netLabels = net.Labels ?? {};
+            if (META_CLASS in netLabels && netLabels[META_CLASS] !== '') {
+                let services = JSON.parse(netLabels[META_CLASS]);
                 for (const service of services) {
                     if (service.endsWith("Service")) {
                         this.services.add(service);
@@ -156,8 +160,9 @@ export class DataSource {
         })
         this._nodes.forEach(node => {
             node.meta.relation = {parent: new Set<string>()};
-            if (META_CLASS in node['Labels'] && node['Labels'][META_CLASS] !== '') {
-                let services = JSON.parse(node['Labels'][META_CLASS]);
+            const nodeLabels = node.Labels ?? {};
+            if (META_CLASS in nodeLabels && nodeLabels[META_CLASS] !== '') {
+                let services = JSON.parse(nodeLabels[META_CLASS]);
                 for (const service of services) {
                     if (service.endsWith("Service")) {
                         this.services.add(service);
@@ -165,7 +170,7 @@ export class DataSource {
                 }
             }
         })
-        const host = import.meta.env.MODE === 'development' ? import.meta.env.VITE_PROXY_ADDRESS.replace(/^https?:\/\//, '') : location.host
+        const host = import.meta.env.MODE === 'development' ? import.meta.env.VITE_PROXY_EMULATOR_ADDRESS.replace(/^https?:\/\//, '') : location.host
         this._socket = new WebSocket(`${this._wsProtocol}://${host}${import.meta.env.VITE_SERVER_URL_PREFIX}/sniff`);
         this._socket.addEventListener('message', (ev) => {
             let msg = ev.data.toString();
@@ -230,11 +235,11 @@ export class DataSource {
         return this._nodes.find(node => node.Names.includes(name));
     }
 
-    getNodeInfoByIP(ip) {
+    getNodeInfoByIP(ip: string) {
         return this._nodes.find(node => {
             const net = node.NetworkSettings.Networks;
             for (const key of Object.keys(net)) {
-                if (net[key]['IPAddress'] === ip) {
+                if (net[key]?.IPAddress === ip) {
                     return true
                 }
             }
@@ -307,7 +312,7 @@ export class DataSource {
      * @param eventName event to listen.
      * @param callback callback.
      */
-    on(eventName: DataEvent, callback?: (data: any) => void) {
+    on(eventName: DataEvent, callback: (data: any) => void = () => {}) {
         switch (eventName) {
             case 'packet':
                 this._packetEventHandler = callback;
@@ -326,7 +331,7 @@ export class DataSource {
         this._nodes.forEach(node => {
             let nets = node.NetworkSettings.Networks;
             Object.keys(nets).forEach(key => {
-                let net = nets[key];
+                let net = nets[key]!;
                 let label = '';
 
                 node.meta.emulatorInfo.nets.forEach((item: { name: string, address: string }) => {
@@ -346,15 +351,15 @@ export class DataSource {
                     for (const item of this._nets) {
                         if (item.Id === net.NetworkID) {
                             if (item.meta.emulatorInfo.type === 'global') {
-                                node.meta.relation.parent.add(item.Id);
+                                node.meta.relation!.parent.add(item.Id);
                             } else {
-                                item.meta.relation.parent.add(node.Id);
+                                item.meta.relation!.parent.add(node.Id);
                             }
                             break;
                         }
                     }
                 } else {
-                    node.meta.relation.parent.add(net.NetworkID);
+                    node.meta.relation!.parent.add(net.NetworkID);
                 }
             })
         })
@@ -385,7 +390,7 @@ export class DataSource {
             if (vertex.hidden) {
                 const nets = node.NetworkSettings.Networks;
                 Object.keys(nets).forEach(key => {
-                    hiddenNodeNetworkIds.add(nets[key].NetworkID)
+                    hiddenNodeNetworkIds.add(nets[key]!.NetworkID)
                 })
             } else {
                 vertices.push(vertex);
@@ -463,7 +468,7 @@ export class DataSource {
         return groups;
     }
 
-    newVertices(currentNode: FullItem<Vertex, 'id'>[]): { vertices: Vertex[], edges: Edge[] } {
+    newVertices(currentNode: FullItem<Vertex, 'id'>): { vertices: Vertex[], edges: Edge[] } {
         let vertices: Vertex[] = [];
         let edges: Edge[] = [];
         if (currentNode["type"] !== "network") {
@@ -616,8 +621,8 @@ export class DataSource {
 
         for (let i = 0; i < currentNodes.length; i++) {
             for (let j = i + 1; j < currentNodes.length; j++) {
-                const nodeA = currentNodes[i];
-                const nodeB = currentNodes[j];
+                const nodeA = currentNodes[i]!;
+                const nodeB = currentNodes[j]!;
 
                 if (nodeA.id === nodeB.id) continue;
 

@@ -42,11 +42,11 @@ Currently, the tool supports the following features:
 
 ### Start the tool during the runtime
 
-The Internet Map runs inside an independent container. We can use the `docker-compose.yml` file inside this folder to bring up the container. 
+The Internet Map frontend runs as one service in the repository-level `docker-compose.yml`. The shared backend APIs are provided by the sibling `emulator-service` directory.
 
 
 1. Start the emulation as you normally would. (e.g., `docker-compose up`)
-2. Run `docker-compose build && docker-compose up` in this folder to build and start the Internet Map container.
+2. Run `docker compose up --build` from the repository root to build and start `emulator-service`, `internet-map`, and any sibling visualization services.
 3. Once the container is up, access the tool using the following pages:
    1. Home page: [http://localhost:8080/](http://localhost:8080/) or [http://localhost:8080/pro/home](http://localhost:8080/pro/home) 
    2. The Map page: [http://localhost:8080/pro/map](http://localhost:8080/pro/map)

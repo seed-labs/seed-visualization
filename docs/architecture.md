@@ -5,7 +5,7 @@
 ## 1. 项目模块总览
 
 ```mermaid
-%%{init: {"theme": "base", "themeVariables": {"fontSize": "18px", "fontFamily": "Arial, Microsoft YaHei, sans-serif"}, "flowchart": {"htmlLabels": true, "nodeSpacing": 90, "rankSpacing": 110, "curve": "basis"}} }%%
+%%{init: {"theme": "base", "themeVariables": {"fontSize": "22px", "fontFamily": "Arial, Microsoft YaHei, sans-serif"}, "flowchart": {"htmlLabels": true, "nodeSpacing": 120, "rankSpacing": 140, "diagramPadding": 36, "wrappingWidth": 180, "curve": "basis"}} }%%
 flowchart TB
   Repo["seed-visualization"]
 
@@ -46,7 +46,7 @@ flowchart TB
 ## 2. Docker Compose 运行时架构
 
 ```mermaid
-%%{init: {"theme": "base", "themeVariables": {"fontSize": "18px", "fontFamily": "Arial, Microsoft YaHei, sans-serif"}, "flowchart": {"htmlLabels": true, "nodeSpacing": 95, "rankSpacing": 120, "curve": "basis"}} }%%
+%%{init: {"theme": "base", "themeVariables": {"fontSize": "22px", "fontFamily": "Arial, Microsoft YaHei, sans-serif"}, "flowchart": {"htmlLabels": true, "nodeSpacing": 120, "rankSpacing": 140, "diagramPadding": 36, "wrappingWidth": 180, "curve": "basis"}} }%%
 flowchart LR
   Browser["Browser"]
 
@@ -61,7 +61,7 @@ flowchart LR
     TrafficC["traffic-observer"]
   end
 
-  DockerAPI["Docker API<br/>/var/run/docker.sock"]
+  DockerAPI["Docker API<br/>Unix Socket<br/>/var/run/docker.sock"]
   HostNet["Host NICs"]
   Kernel["Linux Kernel"]
 
@@ -91,7 +91,7 @@ flowchart LR
 ## 3. Satellite Emulator 前端调用关系
 
 ```mermaid
-%%{init: {"theme": "base", "themeVariables": {"fontSize": "18px", "fontFamily": "Arial, Microsoft YaHei, sans-serif"}, "flowchart": {"htmlLabels": true, "nodeSpacing": 90, "rankSpacing": 115, "curve": "basis"}} }%%
+%%{init: {"theme": "base", "themeVariables": {"fontSize": "22px", "fontFamily": "Arial, Microsoft YaHei, sans-serif"}, "flowchart": {"htmlLabels": true, "nodeSpacing": 120, "rankSpacing": 140, "diagramPadding": 36, "wrappingWidth": 180, "curve": "basis"}} }%%
 flowchart TB
   Dashboard["StarlinkDashboard"]
   Globe["CesiumGlobe"]
@@ -105,12 +105,12 @@ flowchart TB
   Dashboard --> Panels
 
   subgraph DataServices["frontend services"]
-    SatDS["satelliteDataSource"]
-    GroundSvc["groundStationService"]
-    NetworkNodeSvc["networkNodeService"]
-    ContainerSvc["emulatorContainerService"]
-    TrafficSvc["trafficObserverService"]
-    ShellStyle["satelliteShellStyle"]
+    SatDS["<div style='min-width:230px;white-space:nowrap'>satelliteDataSource</div>"]
+    GroundSvc["<div style='min-width:230px;white-space:nowrap'>groundStationService</div>"]
+    NetworkNodeSvc["<div style='min-width:230px;white-space:nowrap'>networkNodeService</div>"]
+    ContainerSvc["<div style='min-width:250px;white-space:nowrap'>emulatorContainerService</div>"]
+    TrafficSvc["<div style='min-width:240px;white-space:nowrap'>trafficObserverService</div>"]
+    ShellStyle["<div style='min-width:220px;white-space:nowrap'>satelliteShellStyle</div>"]
     OrbitSvc["orbitService"]
     TleSvc["tleService"]
   end
@@ -137,10 +137,140 @@ flowchart TB
 - `trafficObserverService`：访问 `/traffic-observer/filter` 和 `/traffic-observer/ws/packets`。
 - `emulatorContainerService`：访问 emulator-service 的 `/container`，用于把容器节点叠加到 Cesium 地球。
 
+### 3.1 Satellite Emulator 前端组件拓扑
+
+这一节拆成两张图：第一张只展示前端组件之间的逐层调用关系；第二张再展示组件、service 和后端 API / WebSocket 的调用关系，避免把 UI 结构和数据访问揉在一张图里。
+
+#### 3.1.1 纯组件关系拓扑
+
+```mermaid
+%%{init: {"theme": "base", "themeVariables": {"fontSize": "22px", "fontFamily": "Arial, Microsoft YaHei, sans-serif"}, "flowchart": {"htmlLabels": true, "nodeSpacing": 120, "rankSpacing": 140, "diagramPadding": 36, "wrappingWidth": 260, "curve": "basis"}} }%%
+flowchart TB
+  Route["Route / Page<br/>Starlink entry"]
+  Dashboard["StarlinkDashboard.vue<br/>页面状态总控"]
+
+  Route --> Dashboard
+
+  subgraph DashboardLayer["StarlinkDashboard 直接组合"]
+    Globe["CesiumGlobe.vue<br/>3D 地球容器"]
+    RightDock["StarlinkRightDock.vue<br/>右下角 Tabs / Dock"]
+    Timeline["TimelineEvents.vue<br/>事件时间轴"]
+    SatDetail["SatelliteDetailPanel.vue<br/>卫星 Hover 详情"]
+    GroundDetail["GroundStationDetailPanel.vue<br/>基站 Hover 详情"]
+    TrafficDetail["TrafficContainerDetailPanel.vue<br/>容器节点 Hover 详情"]
+  end
+
+  Dashboard --> Globe
+  Dashboard --> RightDock
+  Dashboard --> Timeline
+  Dashboard --> SatDetail
+  Dashboard --> GroundDetail
+  Dashboard --> TrafficDetail
+
+  subgraph DockChildren["StarlinkRightDock 内部组件"]
+    ShellLegend["StarlinkShellLegend.vue<br/>Shell 显示 / 隐藏"]
+    SatList["SatelliteList.vue<br/>Satellite / Ground Station<br/>列表与选择"]
+    ReplayPanel["TrafficReplayPanel.vue<br/>Filter / Record<br/>Playback / Seek"]
+  end
+
+  RightDock --> ShellLegend
+  RightDock --> SatList
+  RightDock --> ReplayPanel
+  ShellLegend -->|"toggle shell"| RightDock
+  SatList -->|"select / remove<br/>settings update"| RightDock
+  ReplayPanel -->|"filter / record<br/>play / seek"| RightDock
+  RightDock -->|"starlinkActions<br/>trafficActions"| Dashboard
+  Globe -->|"hover / select / temporary focus"| Dashboard
+  Timeline -->|"jump event / open event list"| Dashboard
+  SatDetail -->|"anchored panel"| Dashboard
+  GroundDetail -->|"anchored panel"| Dashboard
+  TrafficDetail -->|"anchored panel"| Dashboard
+```
+
+#### 3.1.2 组件调用 service / API 拓扑
+
+```mermaid
+%%{init: {"theme": "base", "themeVariables": {"fontSize": "22px", "fontFamily": "Arial, Microsoft YaHei, sans-serif"}, "flowchart": {"htmlLabels": true, "nodeSpacing": 120, "rankSpacing": 140, "diagramPadding": 36, "wrappingWidth": 260, "curve": "basis"}} }%%
+flowchart LR
+  Dashboard["StarlinkDashboard.vue"]
+  Globe["CesiumGlobe.vue"]
+  ShellLegend["StarlinkShellLegend.vue"]
+  SatDetail["SatelliteDetailPanel.vue"]
+
+  subgraph DataServices["组件调用的 service"]
+    SatDS["<div style='min-width:240px;white-space:nowrap'>satelliteDataSource.ts</div><div>卫星位置 + 链路 WS</div>"]
+    OrbitSvc["orbitService.ts<br/>轨道线生成"]
+    TleSvc["tleService.ts<br/>TLE 加载 / 解析"]
+    GroundSvc["<div style='min-width:250px;white-space:nowrap'>groundStationService.ts</div><div>基站数据加载</div>"]
+    NetworkNodeSvc["<div style='min-width:240px;white-space:nowrap'>networkNodeService.ts</div><div>network_nodes.json</div>"]
+    ContainerSvc["<div style='min-width:280px;white-space:nowrap'>emulatorContainerService.ts</div><div>容器节点加载</div>"]
+    TrafficSvc["<div style='min-width:260px;white-space:nowrap'>trafficObserverService.ts</div><div>抓包 filter + packets WS</div>"]
+    ShellStyle["<div style='min-width:230px;white-space:nowrap'>satelliteShellStyle.ts</div><div>Shell 分类 / 颜色</div>"]
+    SatDetailSvc["<div style='min-width:250px;white-space:nowrap'>satelliteDetailService.ts</div><div>卫星详情格式化</div>"]
+  end
+
+  subgraph RenderServices["渲染 service"]
+    Scene["cesiumScene.ts<br/>Viewer / Primitive<br/>Label / Picking"]
+  end
+
+  subgraph BackendAPIs["后端 API / WebSocket / 本地数据"]
+    LinksWS["satellite backend<br/>WS /satellite/link-updates"]
+    ContainerAPI["emulator-service<br/>GET /container"]
+    TrafficFilterAPI["traffic-observer<br/>GET / PUT /filter"]
+    TrafficPacketWS["traffic-observer<br/>WS /ws/packets"]
+    NetworkAPI["satellite backend<br/>GET network-nodes<br/>当前代码保留 / 默认空"]
+    GroundAPI["emulator-service<br/>GET /network<br/>当前代码 mock"]
+    LocalTLE["本地 TLE / orbit metadata"]
+  end
+
+  Dashboard --> SatDS
+  Dashboard --> OrbitSvc
+  Dashboard --> TleSvc
+  Dashboard --> GroundSvc
+  Dashboard --> NetworkNodeSvc
+  Dashboard --> ContainerSvc
+  Dashboard --> TrafficSvc
+  Dashboard --> ShellStyle
+  SatDetail --> SatDetailSvc
+  ShellLegend --> ShellStyle
+  Globe --> Scene
+
+  SatDS --> LinksWS
+  NetworkNodeSvc --> NetworkAPI
+  GroundSvc --> GroundAPI
+  TleSvc --> LocalTLE
+  ContainerSvc --> ContainerAPI
+  TrafficSvc --> TrafficFilterAPI
+  TrafficSvc --> TrafficPacketWS
+```
+
+组件直接调用清单：
+
+| 组件 | 直接调用 | 后端 / 数据来源 | 说明 |
+| --- | --- | --- | --- |
+| `StarlinkDashboard.vue` | `SatelliteDataSource` | `WS /satellite/link-updates` | 接收卫星-卫星、卫星-基站、network path 链路帧 |
+| `StarlinkDashboard.vue` | `fetchEmulatorContainers` | `emulator-service GET /container` | 加载当前 Seed 容器节点，用于容器节点展示和抓包闪烁 |
+| `StarlinkDashboard.vue` | `trafficObserverService` | `traffic-observer GET/PUT /filter`、`WS /ws/packets` | 提交抓包 filter，接收 collector 推送的数据包事件 |
+| `StarlinkDashboard.vue` | `fetchNetworkNodes` | `GET network-nodes` | 当前实现默认返回空数组，接口调用代码保留 |
+| `StarlinkDashboard.vue` | `fetchGroundStationsFromEmulator` | 当前使用 `mockGroundStations` | `GET /network` 调用代码目前注释保留 |
+| `StarlinkDashboard.vue` | `parsePlannedOrbitRecords` / `propagateMany` | 本地 TLE / orbit metadata | 解析 TLE，并按仿真时钟推进卫星位置 |
+| `StarlinkDashboard.vue` | `satelliteShellStyle` | 本地规则 | 计算 Shell 分类、颜色、可见性 |
+| `CesiumGlobe.vue` | `cesiumScene.ts` | Cesium 渲染层 | 渲染点、线、label、hover picking、闪烁效果 |
+| `SatelliteDetailPanel.vue` | `satelliteDetailService.ts` | 本地格式化 | 把卫星对象转换成详情面板行数据 |
+| `StarlinkShellLegend.vue` | `satelliteShellStyle.ts` | 本地规则 | 使用 Shell 颜色和显示状态 |
+
+关系说明：
+
+- `StarlinkDashboard.vue` 是页面级编排层：保存共享状态、把数据传给 `CesiumGlobe` / `StarlinkRightDock` / 详情面板，并接收它们上报的选择、hover、播放、filter 等事件。
+- `CesiumGlobe.vue` 不直接关心业务 API，只桥接 Cesium 生命周期和鼠标事件；真实渲染集中在 `cesiumScene.ts`，包括卫星、基站、容器节点、链路、label、闪烁和 picking。
+- `StarlinkRightDock.vue` 是右下角 Dock 容器，内部再组合 `StarlinkShellLegend.vue`、`SatelliteList.vue`、`TrafficReplayPanel.vue`；它把子组件事件整理成 `starlinkActions` / `trafficActions` 回传给 Dashboard。
+- `TrafficReplayPanel.vue` 负责抓包过滤、记录、播放、拖动 seek 等 UI；底层通过 `trafficObserverService.ts` 调用 `traffic-observer` 的 `/filter` 和 `/ws/packets`。
+- `emulatorContainerService.ts` 从 `emulator-service GET /container` 获取当前系统容器节点；如果容器没有地理位置，前端会分配不重复的展示位置，然后由 `cesiumScene.ts` 渲染。
+
 ## 4. Satellite Backend 调用与广播关系
 
 ```mermaid
-%%{init: {"theme": "base", "themeVariables": {"fontSize": "18px", "fontFamily": "Arial, Microsoft YaHei, sans-serif"}, "flowchart": {"htmlLabels": true, "nodeSpacing": 90, "rankSpacing": 110, "curve": "basis"}} }%%
+%%{init: {"theme": "base", "themeVariables": {"fontSize": "22px", "fontFamily": "Arial, Microsoft YaHei, sans-serif"}, "flowchart": {"htmlLabels": true, "nodeSpacing": 120, "rankSpacing": 140, "diagramPadding": 36, "wrappingWidth": 180, "curve": "basis"}} }%%
 flowchart LR
   Client["Satellite Frontend"]
   SatApi["Satellite API"]
@@ -165,7 +295,7 @@ flowchart LR
 ## 5. emulator-service 调用关系
 
 ```mermaid
-%%{init: {"theme": "base", "themeVariables": {"fontSize": "18px", "fontFamily": "Arial, Microsoft YaHei, sans-serif"}, "flowchart": {"htmlLabels": true, "nodeSpacing": 90, "rankSpacing": 110, "curve": "basis"}} }%%
+%%{init: {"theme": "base", "themeVariables": {"fontSize": "22px", "fontFamily": "Arial, Microsoft YaHei, sans-serif"}, "flowchart": {"htmlLabels": true, "nodeSpacing": 120, "rankSpacing": 140, "diagramPadding": 36, "wrappingWidth": 180, "curve": "basis"}} }%%
 flowchart TB
   Frontends["Frontends"]
   Api["emulator-service API"]
@@ -196,7 +326,7 @@ flowchart TB
 ## 6. traffic-observer 抓包链路
 
 ```mermaid
-%%{init: {"theme": "base", "themeVariables": {"fontSize": "18px", "fontFamily": "Arial, Microsoft YaHei, sans-serif"}, "flowchart": {"htmlLabels": true, "nodeSpacing": 100, "rankSpacing": 120, "curve": "basis"}} }%%
+%%{init: {"theme": "base", "themeVariables": {"fontSize": "22px", "fontFamily": "Arial, Microsoft YaHei, sans-serif"}, "flowchart": {"htmlLabels": true, "nodeSpacing": 120, "rankSpacing": 140, "diagramPadding": 36, "wrappingWidth": 180, "curve": "basis"}} }%%
 flowchart TB
   Frontend["Traffic Replay UI"]
   Control["Control Server"]
@@ -219,7 +349,7 @@ flowchart TB
     FilterMap["filter_cfg map"]
   end
 
-  DockerAPI["Docker API<br/>/var/run/docker.sock"]
+  DockerAPI["Docker API<br/>Unix Socket<br/>/var/run/docker.sock"]
   Containers["SEED containers"]
 
   Frontend -->|"PUT filter"| Control
@@ -264,7 +394,7 @@ flowchart TB
 ## 7. Traffic Replay 前端数据流
 
 ```mermaid
-%%{init: {"theme": "base", "themeVariables": {"fontSize": "18px", "fontFamily": "Arial, Microsoft YaHei, sans-serif"}, "sequence": {"actorFontSize": 18, "messageFontSize": 16, "noteFontSize": 16}} }%%
+%%{init: {"theme": "base", "themeVariables": {"fontSize": "22px", "fontFamily": "Arial, Microsoft YaHei, sans-serif"}, "sequence": {"actorFontSize": 22, "messageFontSize": 20, "noteFontSize": 20, "actorMargin": 100, "messageMargin": 60, "boxMargin": 16}} }%%
 sequenceDiagram
   participant User as User
   participant UI as StarlinkDashboard Traffic Replay
@@ -296,7 +426,7 @@ sequenceDiagram
 ## 8. Internet Map 前端调用关系
 
 ```mermaid
-%%{init: {"theme": "base", "themeVariables": {"fontSize": "18px", "fontFamily": "Arial, Microsoft YaHei, sans-serif"}, "flowchart": {"htmlLabels": true, "nodeSpacing": 90, "rankSpacing": 110, "curve": "basis"}} }%%
+%%{init: {"theme": "base", "themeVariables": {"fontSize": "22px", "fontFamily": "Arial, Microsoft YaHei, sans-serif"}, "flowchart": {"htmlLabels": true, "nodeSpacing": 120, "rankSpacing": 140, "diagramPadding": 36, "wrappingWidth": 180, "curve": "basis"}} }%%
 flowchart TB
   MapApp["internet-map frontend"]
   BaseMap["BaseMap"]

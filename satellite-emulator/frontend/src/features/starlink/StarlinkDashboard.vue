@@ -32,114 +32,41 @@
       <p>{{ renderIsoTime }} UTC</p>
     </section>
 
-    <aside class="right-dock" :class="{ collapsed: dockCollapsed, 'menu-open': dockPageMenuVisible }">
-      <button class="dock-edge-toggle" type="button" @click="toggleDockCollapsed">
-        {{ dockCollapsed ? '<' : '>' }}
-      </button>
-
-      <div class="dock-content">
-        <StarlinkShellLegend
-          v-show="activeDockPage === 'shells'"
-          :items="shellLegendItems"
-          :total-satellite-count="totalSatelliteCount"
-          :hidden-shell-ids="hiddenShellIds"
-          @toggle-shell="toggleShellVisibility"
-        />
-
-        <section
-          v-show="activeDockPage !== 'shells' && activeDockPage !== 'traffic'"
-          class="dock-list-page"
-          :class="`dock-page-${activeDockPage}`"
-        >
-          <h2>
-            <span>{{ activeDockPageLabel }}</span>
-            <em v-if="activeDockPageCount !== undefined">
-              {{ activeDockPageCount.toLocaleString() }}
-            </em>
-          </h2>
-          <SatelliteList
-            embedded
-            hide-header
-            :active-tab="activeDockListTab"
-            :satellites="filteredSatellites"
-            :selected-satellites="selectedOrbitSatellites"
-            :orbit-plane-options="orbitPlaneOptions"
-            :ground-stations="groundStations"
-            :selected-station-ids="selectedGroundStationIds"
-            :connected-station-ids="connectedGroundStationIds"
-            :settings="settings"
-            :current-time="renderTime"
-            :selected-id="selectedSatelliteId"
-            :speed-disabled="trafficCaptureActive"
-            @select="toggleSatelliteOrbit"
-            @focus-selected="focusSelectedSatellite"
-            @remove="removeSatelliteOrbit"
-            @remove-all="removeAllSatelliteOrbits"
-            @station-focus="focusGroundStation"
-            @station-selection-change="updateGroundStationSelection"
-            @update-settings="updateSettings"
-            @set-system-time="setSystemTime"
-            @reset-system-time="resetSystemTime"
-          />
-        </section>
-
-        <section v-if="activeDockPage === 'traffic'" class="dock-list-page dock-page-traffic">
-          <h2>
-            <span>Traffic Replay</span>
-            <em>{{ trafficPacketEvents.length.toLocaleString() }}</em>
-          </h2>
-
-          <TrafficReplayPanel
-            v-model:filter-input="trafficFilterInput"
-            v-model:node-search-input="trafficNodeSearchInput"
-            v-model:playback-interval-ms="trafficPlaybackIntervalMs"
-            :packet-count="trafficPacketEvents.length"
-            :node-search-keyword="trafficNodeSearchKeyword"
-            :node-search-results-count="trafficNodeSearchResults.length"
-            :visible-node-search-results="visibleTrafficNodeSearchResults"
-            :filter-submitting="trafficFilterSubmitting"
-            :panel-disabled="trafficReplayPanelDisabled"
-            :filter-error="trafficFilterError"
-            :filter-status-text="trafficFilterStatusText"
-            :recording-enabled="trafficRecordingEnabled"
-            :playback-enabled="trafficPlaybackEnabled"
-            :playback-paused="trafficPlaybackPaused"
-            :seek-position="trafficReplaySeekPosition"
-            :seek-max="trafficReplaySeekMax"
-            :range-label="trafficReplayRangeLabel"
-            :format-seek-tooltip="formatTrafficReplaySeekTooltip"
-            @submit-filter="submitTrafficFilter"
-            @select-node-search-result="selectTrafficNodeSearchResult"
-            @toggle-recording="toggleTrafficRecording"
-            @toggle-playback="toggleTrafficPlayback"
-            @stop-playback="stopTrafficPlayback"
-            @jump-playback="jumpTrafficPlayback"
-            @clear-recording="clearTrafficRecording"
-            @update-seek-position="updateTrafficReplaySeekPosition"
-            @seek-position="seekTrafficPlaybackPosition"
-          />
-        </section>
-      </div>
-
-      <nav class="dock-pager" aria-label="Right panel pages">
-        <button type="button" @click="switchDockPage(-1)">&lt;</button>
-        <button type="button" class="dock-menu-button" @click="toggleDockPageMenu">&#9776;</button>
-        <button type="button" @click="switchDockPage(1)">&gt;</button>
-      </nav>
-
-      <div v-if="dockPageMenuVisible" class="dock-page-menu">
-        <button
-          v-for="page in dockPages"
-          :key="page.id"
-          type="button"
-          :class="{ active: activeDockPage === page.id }"
-          @click="selectDockPage(page.id)"
-        >
-          <span>{{ page.label }}</span>
-          <em v-if="page.count !== undefined">{{ page.count.toLocaleString() }}</em>
-        </button>
-      </div>
-    </aside>
+    <StarlinkRightDock
+      v-model:filter-input="trafficFilterInput"
+      v-model:node-search-input="trafficNodeSearchInput"
+      v-model:playback-interval-ms="trafficPlaybackIntervalMs"
+      :shell-legend-items="shellLegendItems"
+      :total-satellite-count="totalSatelliteCount"
+      :hidden-shell-ids="hiddenShellIds"
+      :satellites="filteredSatellites"
+      :selected-satellites="selectedOrbitSatellites"
+      :orbit-plane-options="orbitPlaneOptions"
+      :ground-stations="groundStations"
+      :selected-station-ids="selectedGroundStationIds"
+      :connected-station-ids="connectedGroundStationIds"
+      :settings="settings"
+      :current-time="renderTime"
+      :selected-id="selectedSatelliteId"
+      :speed-disabled="trafficCaptureActive"
+      :packet-count="trafficPacketEvents.length"
+      :node-search-keyword="trafficNodeSearchKeyword"
+      :node-search-results-count="trafficNodeSearchResults.length"
+      :visible-node-search-results="visibleTrafficNodeSearchResults"
+      :filter-submitting="trafficFilterSubmitting"
+      :traffic-panel-disabled="trafficReplayPanelDisabled"
+      :filter-error="trafficFilterError"
+      :filter-status-text="trafficFilterStatusText"
+      :recording-enabled="trafficRecordingEnabled"
+      :playback-enabled="trafficPlaybackEnabled"
+      :playback-paused="trafficPlaybackPaused"
+      :seek-position="trafficReplaySeekPosition"
+      :seek-max="trafficReplaySeekMax"
+      :range-label="trafficReplayRangeLabel"
+      :format-seek-tooltip="formatTrafficReplaySeekTooltip"
+      :starlink-actions="starlinkDockActions"
+      :traffic-actions="trafficReplayDockActions"
+    />
 
     <TimelineEvents
       :collapsed="timelineCollapsed"
@@ -159,24 +86,24 @@
     />
 
     <SatelliteDetailPanel
-      :visible="detailVisible"
+      :visible="satelliteDetailVisible"
       :satellite="statusSatellite"
       :anchor="detailPanelAnchor"
-      @close="detailVisible = false"
+      @close="closeSatelliteDetail"
     />
 
     <GroundStationDetailPanel
       :visible="stationDetailVisible"
       :station="statusStation"
       :anchor="detailPanelAnchor"
-      @close="stationDetailVisible = false"
+      @close="closeGroundStationDetail"
     />
 
     <TrafficContainerDetailPanel
       :visible="containerDetailVisible"
       :detail="statusTrafficContainer"
       :anchor="detailPanelAnchor"
-      @close="containerDetailVisible = false"
+      @close="closeTrafficContainerDetail"
     />
   </main>
 </template>
@@ -186,19 +113,9 @@ import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from
 import CesiumGlobe from '@/features/starlink/components/CesiumGlobe.vue';
 import GroundStationDetailPanel from '@/features/starlink/components/GroundStationDetailPanel.vue';
 import SatelliteDetailPanel from '@/features/starlink/components/SatelliteDetailPanel.vue';
-import SatelliteList from '@/features/starlink/components/SatelliteList.vue';
-import StarlinkShellLegend from '@/features/starlink/components/StarlinkShellLegend.vue';
+import StarlinkRightDock from '@/features/starlink/components/StarlinkRightDock.vue';
 import TimelineEvents from '@/features/starlink/components/TimelineEvents.vue';
-import TrafficReplayPanel from '@/features/starlink/components/TrafficReplayPanel.vue';
 import TrafficContainerDetailPanel from '@/features/starlink/components/TrafficContainerDetailPanel.vue';
-import {
-  TIMELINE_LABEL_LANE_COUNT,
-  TIMELINE_LABEL_MIN_GAP_PERCENT,
-  TIMELINE_MARKER_MIN_GAP_PERCENT,
-  TIMELINE_SHIFT_MS,
-  TIMELINE_TICK_MS,
-  TIMELINE_WINDOW_MS,
-} from '@/features/starlink/constants/timeline';
 import {
   FALLBACK_TRAFFIC_NODE_CITIES,
   TRAFFIC_FALLBACK_MIN_DISTANCE_KM,
@@ -208,6 +125,14 @@ import {
   TRAFFIC_REPLAY_MIN_STEP_MS,
 } from '@/features/starlink/constants/trafficReplay';
 import { useSimulationClock } from '@/features/starlink/composables/useSimulationClock';
+import {
+  createGroundTimelineSignature,
+  createNetworkTimelineSignature,
+  createSatelliteTimelineSignature,
+  useTimelineController,
+} from '@/features/starlink/composables/useTimelineController';
+import { useTemporaryFocus } from '@/features/starlink/composables/useTemporaryFocus';
+import { useSelectionDetailPanels } from '@/features/starlink/composables/useSelectionDetailPanels';
 import { SatelliteDataSource } from '@/features/starlink/services/satelliteDataSource';
 import {
   createNearestGroundLinks,
@@ -238,18 +163,11 @@ import type {
   NetworkPathUpdateState,
   SatelliteGroundLink,
   SatellitePoint,
-  ScreenAnchor,
   SimulationSettings,
   TrafficContainerNodeDetail,
   TrafficPacketMessage,
   TrafficPacketReplayEvent,
 } from '@/features/starlink/types';
-import type {
-  TimelineDisplayEvent,
-  TimelineEvent,
-  TimelineEventKind,
-  TimelineTick,
-} from '@/features/starlink/types/timeline';
 
 const records = parsePlannedOrbitRecords();
 const settings = reactive<SimulationSettings>({
@@ -273,39 +191,33 @@ const settings = reactive<SimulationSettings>({
 });
 const selectedSatelliteId = ref<string>();
 const selectedStationId = ref<string>();
-const statusSatelliteId = ref<string>();
-const statusStationId = ref<string>();
-const statusTrafficContainerId = ref<string>();
 const selectedGroundStationIds = ref<string[]>([]);
-const focusedSatelliteOverrideId = ref<string>();
-const focusedStationOverrideId = ref<string>();
 const focusedTrafficContainerNodeId = ref<string>();
-const detailPanelAnchor = ref<ScreenAnchor>();
-const detailVisible = ref(false);
-const stationDetailVisible = ref(false);
-const containerDetailVisible = ref(false);
-let satelliteFocusClearTimer: number | undefined;
-let stationFocusClearTimer: number | undefined;
+const {
+  statusSatelliteId,
+  statusStationId,
+  statusTrafficContainerId,
+  detailPanelAnchor,
+  satelliteDetailVisible,
+  stationDetailVisible,
+  containerDetailVisible,
+  showSatelliteStatus,
+  showGroundStationStatus,
+  showTrafficContainerStatus,
+  closeSatelliteDetail,
+  closeGroundStationDetail,
+  closeTrafficContainerDetail,
+  closeAllSelectionDetails,
+} = useSelectionDetailPanels(computed(() => settings.showSelectionDetails));
+const {
+  focusedSatelliteId,
+  focusedStationId,
+  flashFocusedSatellite,
+  flashFocusedStation,
+  disposeTemporaryFocus,
+} = useTemporaryFocus(TRAFFIC_NODE_FLASH_MS);
 const visibleOrbitIds = ref<string[]>([]);
 const hiddenShellIds = ref<string[]>([]);
-type DockListTab = 'all' | 'selected' | 'stations' | 'settings';
-type DockPage = 'shells' | 'traffic' | DockListTab;
-const dockPageDefinitions: Array<{ id: DockPage; label: string }> = [
-  { id: 'shells', label: 'Starlink Shells' },
-  { id: 'all', label: 'Satellites' },
-  { id: 'selected', label: 'Selected' },
-  { id: 'stations', label: 'Stations' },
-  { id: 'traffic', label: 'Traffic Replay' },
-  { id: 'settings', label: 'Settings' },
-];
-const activeDockPage = ref<DockPage>('shells');
-const dockCollapsed = ref(false);
-const dockPageMenuVisible = ref(false);
-const timelineEventListVisible = ref(false);
-const timelineSortDescending = ref(true);
-const focusedTimelineEventIds = ref<string[]>([]);
-const timelineCollapsed = ref(true);
-const timelineFollowCurrentTime = ref(true);
 const groundStations = ref<GroundStation[]>(mockGroundStations);
 const backendGroundLinks = ref<SatelliteGroundLink[]>([]);
 const backendSatelliteLinks = ref<InterSatelliteLink[]>([]);
@@ -329,8 +241,6 @@ const trafficPlaybackEvents = ref<TrafficPacketReplayEvent[]>([]);
 const trafficPacketEvents = ref<TrafficPacketReplayEvent[]>([]);
 const trafficPlaybackPaused = ref(true);
 const trafficPlaybackIntervalMs = ref(2000);
-const timelineEvents = ref<TimelineEvent[]>([]);
-const timelineWindowOffsetMs = ref(0);
 const lastGroundTimelineSignature = ref('');
 const lastSatelliteTimelineSignature = ref('');
 const lastNetworkTimelineSignature = ref('');
@@ -489,53 +399,43 @@ onUnmounted(() => {
   if (containerRefreshTimerId !== undefined) {
     window.clearInterval(containerRefreshTimerId);
   }
-  if (satelliteFocusClearTimer !== undefined) {
-    window.clearTimeout(satelliteFocusClearTimer);
-  }
-  if (stationFocusClearTimer !== undefined) {
-    window.clearTimeout(stationFocusClearTimer);
-  }
+  disposeTemporaryFocus();
   clearTrafficPlaybackTimer();
   clearTrafficPlaybackClock();
 });
 
 const renderTime = computed(() => now.value);
 const renderIsoTime = computed(() => renderTime.value.toISOString().replace(/\.\d{3}Z$/, ''));
-const timelineCenterMs = computed(() => renderTime.value.getTime() + timelineWindowOffsetMs.value);
-const timelineStartMs = computed(() => timelineCenterMs.value - TIMELINE_WINDOW_MS / 2);
-const timelineEndMs = computed(() => timelineCenterMs.value + TIMELINE_WINDOW_MS / 2);
-const currentTimeLeftPercent = computed(() =>
-  clampPercent(((renderTime.value.getTime() - timelineStartMs.value) / TIMELINE_WINDOW_MS) * 100),
+const {
+  timelineEvents,
+  timelineWindowOffsetMs,
+  timelineEventListVisible,
+  timelineSortDescending,
+  timelineCollapsed,
+  timelineFollowCurrentTime,
+  currentTimeLeftPercent,
+  visibleTimelineEvents,
+  sortedTimelineEvents,
+  timelineTicks,
+  shiftTimelineWindow,
+  syncTimelineToTime,
+  toggleTimelineCollapsed,
+  recordFrameTimelineEvent,
+  recordTimelineEvent,
+  toggleTimelineSort,
+  toggleTimelineEventList,
+  closeTimelineEventList,
+  selectTimelineEventFromList,
+  selectTimelineMarker,
+  followCurrentTime,
+  formatTimelineDateTime,
+} = useTimelineController(
+  renderTime,
+  setTime,
+  (enabled) => {
+    settings.customTimeEnabled = enabled;
+  },
 );
-const visibleTimelineEvents = computed<TimelineDisplayEvent[]>(() =>
-  compactTimelineEvents(
-    timelineEvents.value.filter(
-      (event) =>
-        event.timestampMs >= timelineStartMs.value &&
-        event.timestampMs <= timelineEndMs.value,
-    ),
-    timelineEventListVisible.value ? focusedTimelineEventIds.value : [],
-  ),
-);
-const sortedTimelineEvents = computed(() =>
-  [...timelineEvents.value].sort((left, right) =>
-    timelineSortDescending.value
-      ? right.timestampMs - left.timestampMs
-      : left.timestampMs - right.timestampMs,
-  ),
-);
-const timelineTicks = computed<TimelineTick[]>(() => {
-  const firstTick = Math.ceil(timelineStartMs.value / TIMELINE_TICK_MS) * TIMELINE_TICK_MS;
-  const ticks: TimelineTick[] = [];
-  for (let timestampMs = firstTick; timestampMs <= timelineEndMs.value; timestampMs += TIMELINE_TICK_MS) {
-    ticks.push({
-      timestampMs,
-      leftPercent: clampPercent(((timestampMs - timelineStartMs.value) / TIMELINE_WINDOW_MS) * 100),
-      label: formatTimelineHourMinute(new Date(timestampMs)),
-    });
-  }
-  return ticks;
-});
 const containerNetworkNodes = computed<NetworkNodeLocation[]>(() => {
   const nodes = emulatorContainers.value
     .map((container) => {
@@ -677,23 +577,6 @@ watch(
   },
 );
 const totalSatelliteCount = computed(() => records.length);
-const dockPages = computed(() =>
-  dockPageDefinitions.map((page) => ({
-    ...page,
-    count: getDockPageCount(page.id),
-  })),
-);
-const activeDockPageLabel = computed(
-  () => dockPageDefinitions.find((page) => page.id === activeDockPage.value)?.label ?? 'Menu',
-);
-const activeDockPageCount = computed(() =>
-  activeDockPage.value === 'settings' ? undefined : getDockPageCount(activeDockPage.value),
-);
-const activeDockListTab = computed<DockListTab>(() =>
-  ['all', 'selected', 'stations', 'settings'].includes(activeDockPage.value)
-    ? activeDockPage.value as DockListTab
-    : 'all',
-);
 const orbitPlaneOptions = computed(() =>
   Array.from(
     new Set(
@@ -793,8 +676,6 @@ const displayedSatellites = computed(() => {
 const displayedSatelliteById = computed(() =>
   new Map(displayedSatellites.value.map((satellite) => [satellite.id, satellite])),
 );
-const focusedSatelliteId = computed(() => focusedSatelliteOverrideId.value);
-const focusedStationId = computed(() => focusedStationOverrideId.value);
 const highlightedSatelliteIds = computed(() => {
   const ids = new Set(visibleOrbitIds.value);
 
@@ -874,6 +755,29 @@ const visibleOrbitRecords = computed(() =>
         .filter((record): record is (typeof records)[number] => Boolean(record))
     : [],
 );
+const starlinkDockActions = {
+  toggleShell: toggleShellVisibility,
+  selectSatellite: toggleSatelliteOrbit,
+  focusSelectedSatellite,
+  removeSatellite: removeSatelliteOrbit,
+  removeAllSatellites: removeAllSatelliteOrbits,
+  stationFocus: focusGroundStation,
+  stationSelectionChange: updateGroundStationSelection,
+  updateSettings,
+  setSystemTime,
+  resetSystemTime,
+};
+const trafficReplayDockActions = {
+  submitFilter: submitTrafficFilter,
+  selectNodeSearchResult: selectTrafficNodeSearchResult,
+  toggleRecording: toggleTrafficRecording,
+  togglePlayback: toggleTrafficPlayback,
+  stopPlayback: stopTrafficPlayback,
+  jumpPlayback: jumpTrafficPlayback,
+  clearRecording: clearTrafficRecording,
+  updateSeekPosition: updateTrafficReplaySeekPosition,
+  seekPosition: seekTrafficPlaybackPosition,
+};
 
 function toggleShellVisibility(shellId: string) {
   if (hiddenShellIds.value.includes(shellId)) {
@@ -887,55 +791,26 @@ function toggleShellVisibility(shellId: string) {
 }
 
 function toggleSatelliteOrbit(satellite: SatellitePoint) {
-  stationDetailVisible.value = false;
+  closeGroundStationDetail();
+  closeTrafficContainerDetail();
   selectedSatelliteId.value = satellite.id;
   flashFocusedSatellite(satellite.id);
   toggleSatelliteOrbitState(satellite);
 }
 
 function toggleSatelliteOrbitFromGlobe(satellite: SatellitePoint) {
-  stationDetailVisible.value = false;
+  closeGroundStationDetail();
+  closeTrafficContainerDetail();
   selectedSatelliteId.value = satellite.id;
   flashFocusedSatellite(satellite.id);
   toggleSatelliteOrbitState(satellite);
 }
 
 function focusSelectedSatellite(satellite: SatellitePoint) {
-  stationDetailVisible.value = false;
+  closeGroundStationDetail();
+  closeTrafficContainerDetail();
   selectedSatelliteId.value = satellite.id;
   flashFocusedSatellite(satellite.id);
-}
-
-async function flashFocusedSatellite(satelliteId: string) {
-  if (satelliteFocusClearTimer !== undefined) {
-    window.clearTimeout(satelliteFocusClearTimer);
-  }
-
-  focusedSatelliteOverrideId.value = undefined;
-  await nextTick();
-  focusedSatelliteOverrideId.value = satelliteId;
-  satelliteFocusClearTimer = window.setTimeout(() => {
-    if (focusedSatelliteOverrideId.value === satelliteId) {
-      focusedSatelliteOverrideId.value = undefined;
-    }
-    satelliteFocusClearTimer = undefined;
-  }, TRAFFIC_NODE_FLASH_MS);
-}
-
-async function flashFocusedStation(stationId: string) {
-  if (stationFocusClearTimer !== undefined) {
-    window.clearTimeout(stationFocusClearTimer);
-  }
-
-  focusedStationOverrideId.value = undefined;
-  await nextTick();
-  focusedStationOverrideId.value = stationId;
-  stationFocusClearTimer = window.setTimeout(() => {
-    if (focusedStationOverrideId.value === stationId) {
-      focusedStationOverrideId.value = undefined;
-    }
-    stationFocusClearTimer = undefined;
-  }, TRAFFIC_NODE_FLASH_MS);
 }
 
 function toggleSatelliteOrbitState(satellite: SatellitePoint) {
@@ -954,8 +829,7 @@ function removeSatelliteOrbit(satellite: SatellitePoint) {
   removeBackendSatellite(satellite.id);
   if (selectedSatelliteId.value === satellite.id) {
     selectedSatelliteId.value = undefined;
-    focusedSatelliteOverrideId.value = undefined;
-    detailVisible.value = false;
+    closeSatelliteDetail();
   }
 }
 
@@ -969,8 +843,7 @@ function removeAllSatelliteOrbits() {
   backendSatelliteLinks.value = [];
   backendLinkedSatelliteIds.value = [];
   selectedSatelliteId.value = undefined;
-  focusedSatelliteOverrideId.value = undefined;
-  detailVisible.value = false;
+  closeSatelliteDetail();
 }
 
 function removeBackendSatellite(satelliteId: string) {
@@ -1029,16 +902,14 @@ function updateSettings(nextSettings: SimulationSettings) {
   );
   Object.assign(settings, sanitizedSettings);
   if (!settings.showSelectionDetails) {
-    detailVisible.value = false;
-    stationDetailVisible.value = false;
-    containerDetailVisible.value = false;
+    closeAllSelectionDetails();
   }
   if (!settings.showSatellites) {
-    detailVisible.value = false;
+    closeSatelliteDetail();
     statusSatelliteId.value = undefined;
   }
   if (!settings.showGroundStations) {
-    stationDetailVisible.value = false;
+    closeGroundStationDetail();
     statusStationId.value = undefined;
   }
 }
@@ -1058,219 +929,6 @@ function sanitizeSelectedOrbitPlanesForVisibleShells(hiddenShellIdsSnapshot: str
   if (nextPlaneIds.length !== settings.selectedOrbitPlaneIds.length) {
     settings.selectedOrbitPlaneIds = nextPlaneIds;
   }
-}
-
-function toggleDockCollapsed() {
-  dockCollapsed.value = !dockCollapsed.value;
-  if (dockCollapsed.value) {
-    dockPageMenuVisible.value = false;
-  }
-}
-
-function getDockPageCount(page: DockPage) {
-  if (page === 'shells') {
-    return totalSatelliteCount.value;
-  }
-
-  if (page === 'all') {
-    return filteredSatellites.value.length;
-  }
-
-  if (page === 'selected') {
-    return selectedOrbitSatellites.value.length;
-  }
-
-  if (page === 'stations') {
-    return groundStations.value.length;
-  }
-
-  if (page === 'traffic') {
-    return trafficPacketEvents.value.length;
-  }
-
-  return undefined;
-}
-
-function toggleDockPageMenu() {
-  dockPageMenuVisible.value = !dockPageMenuVisible.value;
-  dockCollapsed.value = false;
-}
-
-function selectDockPage(page: DockPage) {
-  activeDockPage.value = page;
-  dockPageMenuVisible.value = false;
-  dockCollapsed.value = false;
-}
-
-function switchDockPage(direction: -1 | 1) {
-  const currentIndex = dockPageDefinitions.findIndex((page) => page.id === activeDockPage.value);
-  const nextIndex = (currentIndex + direction + dockPageDefinitions.length) % dockPageDefinitions.length;
-  activeDockPage.value = dockPageDefinitions[nextIndex].id;
-  dockPageMenuVisible.value = false;
-  dockCollapsed.value = false;
-}
-
-function shiftTimelineWindow(direction: -1 | 1) {
-  timelineFollowCurrentTime.value = false;
-  timelineWindowOffsetMs.value += direction * TIMELINE_SHIFT_MS;
-}
-
-function syncTimelineToTime(timestampMs: number) {
-  timelineFollowCurrentTime.value = false;
-  timelineWindowOffsetMs.value = timestampMs - renderTime.value.getTime();
-}
-
-function toggleTimelineCollapsed() {
-  timelineCollapsed.value = !timelineCollapsed.value;
-  if (timelineCollapsed.value) {
-    closeTimelineEventList();
-  }
-}
-
-function compactTimelineEvents(events: TimelineEvent[], focusedEventIds: string[]) {
-  const focusedEventIdSet = new Set(focusedEventIds);
-  const eventsByTimestamp = new Map<number, TimelineEvent[]>();
-  events.forEach((event) => {
-    eventsByTimestamp.set(event.timestampMs, [
-      ...(eventsByTimestamp.get(event.timestampMs) ?? []),
-      event,
-    ]);
-  });
-
-  const timestampEvents = Array.from(eventsByTimestamp.values()).map((timestampGroup) => {
-    const displayEvent =
-      timestampGroup.find((event) => focusedEventIdSet.has(event.id)) ??
-      timestampGroup[timestampGroup.length - 1];
-    return {
-      ...displayEvent,
-      clusterCount: timestampGroup.length,
-      groupedEventIds: timestampGroup.map((event) => event.id),
-      isCluster: timestampGroup.length > 1,
-      leftPercent: clampPercent(
-        ((displayEvent.timestampMs - timelineStartMs.value) / TIMELINE_WINDOW_MS) * 100,
-      ),
-      clusterWidthPercent: 0,
-      labelLane: 0,
-      timeLabel: formatTimelineClock(new Date(displayEvent.timestampMs)),
-      showLabel: false,
-    };
-    })
-    .sort((left, right) => left.leftPercent - right.leftPercent);
-
-  if (focusedEventIds.length) {
-    return assignTimelineLabelLanes(
-      timestampEvents
-      .filter((event) => event.groupedEventIds.some((eventId) => focusedEventIdSet.has(eventId)))
-      .map((event) => ({
-        ...event,
-        showLabel: true,
-      })),
-      true,
-    );
-  }
-
-  const markerGroups = groupTimelineMarkersByDistance(timestampEvents);
-  const displayEvents = markerGroups
-    .map((group) => {
-      const displayEvent = [...group].sort((left, right) => right.timestampMs - left.timestampMs)[0];
-      const groupedEventIds = group.flatMap((event) => event.groupedEventIds);
-      const clusterCount = group.reduce((total, event) => total + event.clusterCount, 0);
-      const clusterStartPercent = Math.min(...group.map((event) => event.leftPercent));
-      const clusterEndPercent = Math.max(...group.map((event) => event.leftPercent));
-      return {
-        ...displayEvent,
-        clusterCount,
-        groupedEventIds,
-        isCluster: clusterCount > 1,
-        leftPercent: clusterStartPercent,
-        clusterWidthPercent: clusterEndPercent - clusterStartPercent,
-        showLabel: false,
-      };
-    })
-    .sort((left, right) => right.timestampMs - left.timestampMs)
-    .map((event) => ({ ...event, showLabel: true }));
-
-  return assignTimelineLabelLanes(displayEvents)
-    .sort((left, right) => left.timestampMs - right.timestampMs);
-}
-
-function assignTimelineLabelLanes(events: TimelineDisplayEvent[], forceShow = false) {
-  const laneSlots: number[][] = Array.from({ length: TIMELINE_LABEL_LANE_COUNT }, () => []);
-
-  return events.map((event) => {
-    const labelAnchorPercent = getTimelineLabelAnchorPercent(event);
-    const laneIndex = laneSlots.findIndex((slots) =>
-      slots.every((leftPercent) => Math.abs(leftPercent - labelAnchorPercent) >= TIMELINE_LABEL_MIN_GAP_PERCENT),
-    );
-
-    if (laneIndex === -1) {
-      return {
-        ...event,
-        labelLane: TIMELINE_LABEL_LANE_COUNT - 1,
-        showLabel: forceShow ? event.showLabel : false,
-      };
-    }
-
-    laneSlots[laneIndex].push(labelAnchorPercent);
-    return {
-      ...event,
-      labelLane: laneIndex,
-      showLabel: event.showLabel,
-    };
-  });
-}
-
-function getTimelineLabelAnchorPercent(event: TimelineDisplayEvent) {
-  return event.isCluster
-    ? clampPercent(event.leftPercent + event.clusterWidthPercent + 1)
-    : event.leftPercent;
-}
-
-function groupTimelineMarkersByDistance(events: TimelineDisplayEvent[]) {
-  const groups: TimelineDisplayEvent[][] = [];
-
-  events.forEach((event) => {
-    const lastGroup = groups[groups.length - 1];
-    const lastEvent = lastGroup?.[lastGroup.length - 1];
-    if (lastGroup && lastEvent && Math.abs(event.leftPercent - lastEvent.leftPercent) < TIMELINE_MARKER_MIN_GAP_PERCENT) {
-      lastGroup.push(event);
-      return;
-    }
-
-    groups.push([event]);
-  });
-
-  return groups;
-}
-
-function formatTimelineClock(date: Date) {
-  return new Intl.DateTimeFormat('zh-CN', {
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false,
-  }).format(date);
-}
-
-function formatTimelineHourMinute(date: Date) {
-  return new Intl.DateTimeFormat('zh-CN', {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).format(date);
-}
-
-function formatTimelineDateTime(date: Date) {
-  const datePart = new Intl.DateTimeFormat('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(date).replace(/\//g, '-');
-  return `${datePart} ${formatTimelineClock(date)}`;
-}
-
-function clampPercent(value: number) {
-  return Math.min(100, Math.max(0, value));
 }
 
 function rememberTrafficPacketNodes(message: TrafficPacketMessage) {
@@ -1893,9 +1551,7 @@ async function selectTrafficNodeSearchResult(containerId: string) {
   focusedTrafficContainerNodeId.value = normalizedContainerId;
   markTrafficContainerActive(containerId);
   statusTrafficContainerId.value = containerId;
-  detailVisible.value = false;
-  stationDetailVisible.value = false;
-  containerDetailVisible.value = false;
+  closeAllSelectionDetails();
 }
 
 function markTrafficContainerActive(containerId: string) {
@@ -2188,187 +1844,6 @@ function normalizeContainerNodeType(role: string | undefined) {
   return role || 'container';
 }
 
-function recordFrameTimelineEvent(
-  kind: TimelineEventKind,
-  label: string,
-  shortLabel: string,
-  sampleTime: Date,
-  signature: string,
-  lastSignature: { value: string },
-  fallbackDetail: string,
-) {
-  if (!signature || signature === lastSignature.value) {
-    return;
-  }
-
-  const changes = createTimelineChangeDetails(kind, signature, lastSignature.value, fallbackDetail);
-  lastSignature.value = signature;
-  changes.forEach((change) => {
-    recordTimelineEvent(kind, label, change.action, shortLabel, sampleTime.getTime(), change.detail);
-  });
-}
-
-function recordTimelineEvent(
-  kind: TimelineEventKind,
-  label: string,
-  action: string,
-  shortLabel: string,
-  timestampMs: number,
-  detail = label,
-) {
-  const isoTime = new Date(timestampMs).toISOString().replace(/\.\d{3}Z$/, '');
-  const event: TimelineEvent = {
-    id: `${kind}:${timestampMs}:${Math.random().toString(36).slice(2, 8)}`,
-    kind,
-    timestampMs,
-    label,
-    action,
-    shortLabel,
-    detail,
-    isoTime,
-  };
-
-  timelineEvents.value = [...timelineEvents.value, event].sort(
-    (left, right) => left.timestampMs - right.timestampMs,
-  );
-}
-
-function toggleTimelineSort() {
-  timelineSortDescending.value = !timelineSortDescending.value;
-}
-
-function toggleTimelineEventList() {
-  timelineEventListVisible.value = !timelineEventListVisible.value;
-  if (!timelineEventListVisible.value) {
-    focusedTimelineEventIds.value = [];
-  }
-}
-
-function closeTimelineEventList() {
-  timelineEventListVisible.value = false;
-  focusedTimelineEventIds.value = [];
-}
-
-function selectTimelineEventFromList(event: TimelineEvent) {
-  focusedTimelineEventIds.value = [event.id];
-  jumpToTimelineEvent(event);
-}
-
-function selectTimelineMarker(event: TimelineDisplayEvent) {
-  if (event.isCluster) {
-    timelineEventListVisible.value = true;
-    focusedTimelineEventIds.value = event.groupedEventIds;
-  }
-  jumpToTimelineEvent(event);
-}
-
-function jumpToTimelineEvent(event: TimelineEvent) {
-  setTime(event.timestampMs);
-  settings.customTimeEnabled = true;
-  syncTimelineToTime(event.timestampMs);
-}
-
-function createGroundTimelineSignature(links: SatelliteGroundLink[]) {
-  return links
-    .map((link) => `${link.satelliteId}->${link.stationId}`)
-    .sort()
-    .join('|');
-}
-
-function createTimelineChangeDetails(
-  kind: TimelineEventKind,
-  currentSignature: string,
-  previousSignature: string,
-  fallbackDetail: string,
-) {
-  const currentItems = parseTimelineSignatureItems(kind, currentSignature);
-  const previousItems = parseTimelineSignatureItems(kind, previousSignature);
-  const currentByKey = new Map(currentItems.map((item) => [item.key, item]));
-  const previousByKey = new Map(previousItems.map((item) => [item.key, item]));
-  const changes: Array<{ action: string; detail: string }> = [];
-
-  currentItems.forEach((currentItem) => {
-    const previousItem = previousByKey.get(currentItem.key);
-    if (!previousItem) {
-      changes.push({ action: 'Added', detail: formatSignatureItem(currentItem.raw) });
-      return;
-    }
-
-    if (previousItem.value !== currentItem.value) {
-      changes.push({
-        action: 'Update',
-        detail: `${formatSignatureItem(currentItem.key)}: ${formatSignatureItem(previousItem.value)} -> ${formatSignatureItem(currentItem.value)}`,
-      });
-    }
-  });
-
-  previousItems.forEach((previousItem) => {
-    if (!currentByKey.has(previousItem.key)) {
-      changes.push({ action: 'Removed', detail: formatSignatureItem(previousItem.raw) });
-    }
-  });
-
-  return changes.length
-    ? changes
-    : [{ action: 'Update', detail: `${fallbackDetail}: ${currentItems.length} active` }];
-}
-
-function parseTimelineSignatureItems(kind: TimelineEventKind, signature: string) {
-  return signature
-    .split('|')
-    .filter(Boolean)
-    .map((raw) => {
-      if (kind === 'ground') {
-        const [satelliteId, stationId] = raw.split('->');
-        return {
-          key: satelliteId || raw,
-          value: stationId || raw,
-          raw,
-        };
-      }
-
-      if (kind === 'network') {
-        const separatorIndex = raw.indexOf(':f=');
-        if (separatorIndex > -1) {
-          return {
-            key: raw.slice(0, separatorIndex),
-            value: raw.slice(separatorIndex + 1),
-            raw,
-          };
-        }
-      }
-
-      return {
-        key: raw,
-        value: raw,
-        raw,
-      };
-    });
-}
-
-function formatSignatureItem(value: string) {
-  return value.length > 72 ? `${value.slice(0, 69)}...` : value;
-}
-
-function createSatelliteTimelineSignature(links: InterSatelliteLink[]) {
-  return links
-    .map((link) => [link.satelliteAId, link.satelliteBId].sort().join('<->'))
-    .sort()
-    .join('|');
-}
-
-function createNetworkTimelineSignature(links: NetworkPathUpdateState[]) {
-  return links
-    .map((link, index) => {
-      const flowId = link.id ?? `flow-${index}`;
-      const forward = link.forwardPath.map((node) => `${node.type}:${node.id}`).join('>');
-      const backward = link.returnPath.map((node) => `${node.type}:${node.id}`).join('>');
-      return `${flowId}:f=${forward}:r=${backward}`;
-    })
-    .sort()
-    .join('|');
-}
-
 function setSystemTime(timestampMs: number) {
   setTime(timestampMs);
   settings.customTimeEnabled = true;
@@ -2401,37 +1876,7 @@ function resetSystemTime() {
 function focusGroundStation(station: GroundStation) {
   selectedStationId.value = station.id;
   void flashFocusedStation(station.id);
-  detailVisible.value = false;
-}
-
-function showSatelliteStatus(satellite: SatellitePoint | undefined, anchor?: ScreenAnchor) {
-  statusSatelliteId.value = satellite?.id;
-  detailVisible.value = Boolean(satellite && settings.showSelectionDetails);
-  if (satellite) {
-    detailPanelAnchor.value = anchor;
-    stationDetailVisible.value = false;
-    containerDetailVisible.value = false;
-  }
-}
-
-function showGroundStationStatus(station: GroundStation | undefined, anchor?: ScreenAnchor) {
-  statusStationId.value = station?.id;
-  stationDetailVisible.value = Boolean(station && settings.showSelectionDetails);
-  if (station) {
-    detailPanelAnchor.value = anchor;
-    detailVisible.value = false;
-    containerDetailVisible.value = false;
-  }
-}
-
-function showTrafficContainerStatus(node: NetworkNodeLocation | undefined, anchor?: ScreenAnchor) {
-  statusTrafficContainerId.value = node?.id;
-  containerDetailVisible.value = Boolean(node && settings.showSelectionDetails);
-  if (node) {
-    detailPanelAnchor.value = anchor;
-    detailVisible.value = false;
-    stationDetailVisible.value = false;
-  }
+  closeSatelliteDetail();
 }
 
 function updateGroundStationSelection(stationIds: string[]) {
@@ -2451,7 +1896,7 @@ function updateGroundStationSelection(stationIds: string[]) {
 
   if (selectedStationId.value && !nextStationIdSet.has(selectedStationId.value)) {
     selectedStationId.value = undefined;
-    stationDetailVisible.value = false;
+    closeGroundStationDetail();
   }
 }
 </script>

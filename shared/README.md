@@ -1,4 +1,4 @@
-# Shared Modules
+﻿# Shared Modules
 
 This directory contains reusable internal capabilities for the SEED visualization stack.
 
@@ -62,4 +62,4 @@ Poor shared module responsibilities:
 - one service's route handlers;
 - experiment-specific orchestration.
 
-For example, `shared/go/docker-api` owns Docker daemon communication for Go callers. `traffic-observer` still owns container netns/veth discovery because that is observer-specific host instrumentation logic.
+For example, `shared/go/docker-api` owns Docker daemon communication for Go callers. `traffic-observer-service` still owns container netns/veth discovery because that is observer-specific host instrumentation logic.

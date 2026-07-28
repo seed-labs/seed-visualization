@@ -599,8 +599,6 @@ export function createCesiumScene(container: HTMLElement): CesiumSceneApi {
 
     lastLinkSnapshots = nextLinkSnapshots;
 
-    focusSceneTarget(options, satelliteById, stationById, networkNodeById);
-
     function renderTrackedLink(snapshot: LinkSnapshot) {
       nextLinkSnapshots.set(snapshot.key, snapshot);
       const flashUntil = linkFlashUntilByKey.get(snapshot.key);
@@ -789,73 +787,6 @@ export function createCesiumScene(container: HTMLElement): CesiumSceneApi {
     return `network:${flowKey}:${direction}:${hopIndex}:${source.type}:${source.id}->${target.type}:${target.id}`;
   }
 
-  function focusSceneTarget(
-    options: RenderOptions,
-    satelliteById: Map<string, SatellitePoint>,
-    stationById: Map<string, GroundStation>,
-    networkNodeById: Map<string, NetworkNodeLocation>,
-  ) {
-    const satellite = options.focusedSatelliteId
-      ? satelliteById.get(options.focusedSatelliteId)
-      : undefined;
-    const station =
-      !satellite && options.focusedStationId ? stationById.get(options.focusedStationId) : undefined;
-    const containerNode =
-      !satellite && !station && options.focusedContainerNodeId
-        ? resolveFocusedContainerNode(options.focusedContainerNodeId, networkNodeById)
-        : undefined;
-    const focusKey = satellite
-      ? `satellite:${satellite.id}`
-      : station
-        ? `station:${station.id}`
-        : containerNode
-          ? `container:${containerNode.id}`
-          : undefined;
-
-    if (!focusKey) {
-      lastFocusKey = undefined;
-      return;
-    }
-
-    if (focusKey === lastFocusKey) {
-      return;
-    }
-
-    lastFocusKey = focusKey;
-    const currentHeight = viewer.camera.positionCartographic.height;
-    const destination = satellite
-      ? Cartesian3.fromDegrees(
-          satellite.longitude,
-          satellite.latitude,
-          currentHeight,
-        )
-      : station
-        ? Cartesian3.fromDegrees(station.longitude, station.latitude, currentHeight)
-        : Cartesian3.fromDegrees(containerNode!.longitude, containerNode!.latitude, currentHeight);
-
-    viewer.camera.flyTo({
-      destination,
-      duration: 0.9,
-      orientation: {
-        heading: 0,
-        pitch: CesiumMath.toRadians(-90),
-        roll: 0,
-      },
-    });
-  }
-
-  function resolveFocusedContainerNode(
-    nodeId: string,
-    networkNodeById: Map<string, NetworkNodeLocation>,
-  ) {
-    return (
-      networkNodeById.get(nodeId) ??
-      Array.from(networkNodeById.values()).find((node) =>
-        node.id.startsWith(nodeId) || nodeId.startsWith(node.id),
-      )
-    );
-  }
-
   viewer.screenSpaceEventHandler.setInputAction((movement: { position: Cartesian2 }) => {
     const picked = viewer.scene.pick(movement.position);
     const pickedItem = picked?.primitive?.id as
@@ -956,7 +887,6 @@ export function createCesiumScene(container: HTMLElement): CesiumSceneApi {
   let containerNodeHoverHandler: RenderOptions['onContainerNodeHover'] = () => undefined;
   let lastSelectedId: string | undefined;
   let lastHighlightedIds = new Set<string>();
-  let lastFocusKey: string | undefined;
   function optionsSafeSelect(satellite: SatellitePoint) {
     selectHandler(satellite);
   }

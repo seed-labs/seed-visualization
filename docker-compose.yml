@@ -23,7 +23,6 @@ services:
       - emulator-service
     ports:
       - "8080:80"
-      - "8081:8081"
     networks:
       - internet-map
     restart: unless-stopped
@@ -35,18 +34,32 @@ services:
       dockerfile: Dockerfile
     depends_on:
       - emulator-service
+      - satellite-emulator-service
+      # - traffic-observer-service
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "9090:80"
+    networks:
+      - internet-map
+    restart: unless-stopped
+
+  satellite-emulator-service:
+    container_name: satellite-emulator-service
+    build:
+      context: satellite-emulator-service
+      dockerfile: Dockerfile
+    ports:
       - "9091:9091"
     networks:
       - internet-map
     restart: unless-stopped
 
-  traffic-observer:
-    container_name: traffic-observer
+  traffic-observer-service:
+    container_name: traffic-observer-service
     build:
       context: .
-      dockerfile: traffic-observer/Dockerfile
+      dockerfile: traffic-observer-service/Dockerfile
     privileged: true
     pid: host
     network_mode: host

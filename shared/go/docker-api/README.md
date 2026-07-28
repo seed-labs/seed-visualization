@@ -1,4 +1,4 @@
-# Docker API Go Module
+﻿# Docker API Go Module
 
 Go implementation of the shared Docker API capability for the SEED visualization tooling.
 
@@ -23,18 +23,18 @@ It should not own higher-level SEED semantics such as:
 - packet filtering;
 - frontend event models.
 
-Those belong to the caller. For example, `traffic-observer` uses this package to get container PID/labels/network settings, then performs netns/veth discovery locally.
+Those belong to the caller. For example, `traffic-observer-service` uses this package to get container PID/labels/network settings, then performs netns/veth discovery locally.
 
 ## Current operations
 
 | Operation | Docker endpoint | Used by |
 |---|---|---|
-| `ListContainers` | `GET /containers/json` | traffic-observer |
-| `InspectContainer` | `GET /containers/{id}/json` | traffic-observer |
+| `ListContainers` | `GET /containers/json` | traffic-observer-service |
+| `InspectContainer` | `GET /containers/{id}/json` | traffic-observer-service |
 
 ## Language bindings
 
-The Go binding is implemented first because `traffic-observer` is Go and needs direct Unix socket access.
+The Go binding is implemented first because `traffic-observer-service` is Go and needs direct Unix socket access.
 
 TypeScript and Python bindings should follow the same DTO shape as the schemas under `shared/schemas/docker-api/`.
 

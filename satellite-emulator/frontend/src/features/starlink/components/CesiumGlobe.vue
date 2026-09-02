@@ -9,11 +9,11 @@ import {
   createCesiumScene,
   type CesiumSceneApi,
 } from '@/features/starlink/services/cesiumScene';
+import { GROUND_STATION_FOCUS_FLASH_MS } from '@/features/starlink/constants/trafficReplay';
 import type {
   GroundStation,
   NetworkNodeLocation,
   InterSatelliteLink,
-  NetworkPathUpdateState,
   PlannedOrbitRecord,
   SatelliteGroundLink,
   SatellitePoint,
@@ -28,13 +28,13 @@ const props = defineProps<{
   groundStations: GroundStation[];
   groundLinks: SatelliteGroundLink[];
   satelliteLinks: InterSatelliteLink[];
-  networkLinks: NetworkPathUpdateState[];
-  networkNodes: NetworkNodeLocation[];
   containerNodes: NetworkNodeLocation[];
   activeTrafficNodeIds: string[];
   focusedSatelliteId?: string;
   focusedStationId?: string;
   focusedContainerNodeId?: string;
+  frontSatelliteId?: string;
+  frontStationId?: string;
   showSatellites: boolean;
   showGroundStations: boolean;
   showLabels: boolean;
@@ -61,13 +61,13 @@ function render() {
     groundStations: props.groundStations,
     groundLinks: props.groundLinks,
     satelliteLinks: props.satelliteLinks,
-    networkLinks: props.networkLinks,
-    networkNodes: props.networkNodes,
     containerNodes: props.containerNodes,
     activeTrafficNodeIds: props.activeTrafficNodeIds,
     focusedSatelliteId: props.focusedSatelliteId,
     focusedStationId: props.focusedStationId,
     focusedContainerNodeId: props.focusedContainerNodeId,
+    frontSatelliteId: props.frontSatelliteId,
+    frontStationId: props.frontStationId,
     showSatellites: props.showSatellites,
     showGroundStations: props.showGroundStations,
     showLabels: props.showLabels,
@@ -116,13 +116,13 @@ watch(
     props.groundStations,
     props.groundLinks,
     props.satelliteLinks,
-    props.networkLinks,
-    props.networkNodes,
     props.containerNodes,
     props.activeTrafficNodeIds,
     props.focusedSatelliteId,
     props.focusedStationId,
     props.focusedContainerNodeId,
+    props.frontSatelliteId,
+    props.frontStationId,
     props.showSatellites,
     props.showGroundStations,
     props.showLabels,
@@ -132,14 +132,14 @@ watch(
 );
 
 watch(
-  () => [props.groundLinks, props.satelliteLinks, props.networkLinks, props.activeTrafficNodeIds],
+  () => [props.groundLinks, props.satelliteLinks, props.activeTrafficNodeIds],
   () => renderLinkChangeAnimation(),
   { deep: false },
 );
 
 watch(
   () => [props.focusedSatelliteId, props.focusedStationId],
-  () => renderLinkChangeAnimation(1200),
+  ([, focusedStationId]) => renderLinkChangeAnimation(focusedStationId ? GROUND_STATION_FOCUS_FLASH_MS : 1200),
   { deep: false },
 );
 

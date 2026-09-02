@@ -20,22 +20,23 @@ function joinUrl(baseUrl: string, prefix: string) {
 }
 
 const apiBaseUrl = '';
-const apiPrefix = import.meta.env.VITE_SERVER_URL_PREFIX ?? '/api/v1';
-const emulatorApiPrefix = import.meta.env.VITE_SERVER_EMULATOR_URL_PREFIX ?? '/emulator/api/v1';
+const metaEnv = import.meta.env ?? {};
+const apiPrefix = metaEnv.VITE_SERVER_URL_PREFIX ?? '/api/v1';
+const emulatorApiPrefix = metaEnv.VITE_SERVER_EMULATOR_URL_PREFIX ?? '/emulator/api/v1';
 
 export const appConfig = {
-  title: import.meta.env.VITE_FRONTEND_TITLE ?? 'Starlink Satellite 3D Globe Simulation',
-  baseUrl: import.meta.env.VITE_FRONTEND_URL_PREFIX ?? import.meta.env.BASE_URL,
+  title: metaEnv.VITE_FRONTEND_TITLE ?? 'Starlink Satellite 3D Globe Simulation',
+  baseUrl: metaEnv.VITE_FRONTEND_URL_PREFIX ?? metaEnv.BASE_URL,
   api: {
     baseUrl: apiBaseUrl,
     prefix: apiPrefix,
     basePath: joinUrl(apiBaseUrl, apiPrefix),
-    timeout: readNumberEnv(import.meta.env.VITE_SERVER_TIMEOUT, 30000),
+    timeout: readNumberEnv(metaEnv.VITE_SERVER_TIMEOUT, 30000),
   },
   emulatorApi: {
     baseUrl: apiBaseUrl,
     prefix: emulatorApiPrefix,
     basePath: joinUrl(apiBaseUrl, emulatorApiPrefix),
-    timeout: readNumberEnv(import.meta.env.VITE_SERVER_TIMEOUT, 30000),
+    timeout: readNumberEnv(metaEnv.VITE_SERVER_TIMEOUT, 30000),
   },
 } as const;

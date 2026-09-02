@@ -18,7 +18,7 @@ export class PluginManager implements LogProducer {
     public plugins: IPlugin[] = [];
     private readonly _pluginDirs: string[];
 
-    constructor(pluginDirs: string[] = ['../plugin'], namespace: String = '') {
+    constructor(pluginDirs: string[] = ['./plugin'], namespace: String = '') {
         this._pluginDirs = pluginDirs.map(pluginDir => path.resolve(pluginDir));
         this._logger = new Logger({name: `${namespace}PluginManager`});
         this.discoverPlugins().then(r => {

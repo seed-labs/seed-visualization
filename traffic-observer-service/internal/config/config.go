@@ -14,8 +14,9 @@ type Config struct {
 	OnlySeedContainers   bool
 	DiscoveryConcurrency int
 	Interfaces           []string
-	FallbackInterfaces   []string
 	WebSocketSinkURL     string
+	PcapOutputDir        string
+	PcapEnabled          bool
 }
 
 func Load() Config {
@@ -27,8 +28,9 @@ func Load() Config {
 		OnlySeedContainers:   envBool("TRAFFIC_ONLY_SEED_CONTAINERS", true),
 		DiscoveryConcurrency: envInt("TRAFFIC_DISCOVERY_CONCURRENCY", 32),
 		Interfaces:           splitCSV(env("TRAFFIC_INTERFACES", "")),
-		FallbackInterfaces:   splitCSV(env("TRAFFIC_FALLBACK_INTERFACES", "docker0")),
 		WebSocketSinkURL:     strings.TrimSpace(os.Getenv("EMULATOR_SERVICE_TRAFFIC_URL")),
+		PcapOutputDir:        env("TRAFFIC_PCAP_OUTPUT_DIR", "pcap"),
+		PcapEnabled:          envBool("TRAFFIC_PCAP_ENABLED", false),
 	}
 }
 

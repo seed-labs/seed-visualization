@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"os"
 	"os/signal"
 	"strings"
 	"syscall"
@@ -17,6 +18,8 @@ import (
 	"seed-visualization/traffic-observer-service/internal/dockeriface"
 	"seed-visualization/traffic-observer-service/internal/event"
 	"seed-visualization/traffic-observer-service/internal/filter"
+	"seed-visualization/traffic-observer-service/internal/ifacemanager"
+	"seed-visualization/traffic-observer-service/internal/pcaprecorder"
 	"seed-visualization/traffic-observer-service/internal/probe"
 	"seed-visualization/traffic-observer-service/internal/realtime"
 	"seed-visualization/traffic-observer-service/internal/sink"
@@ -25,9 +28,23 @@ import (
 )
 
 func main() {
+	configureLogTimeZone()
 	if err := run(); err != nil {
 		log.Fatalf("traffic observer stopped: %v", err)
 	}
+}
+
+func configureLogTimeZone() {
+	name := strings.TrimSpace(os.Getenv("TRAFFIC_LOG_TIMEZONE"))
+	if name == "" {
+		name = "Asia/Shanghai"
+	}
+
+	location, err := time.LoadLocation(name)
+	if err != nil {
+		location = time.FixedZone("Asia/Shanghai", 8*60*60)
+	}
+	time.Local = location
 }
 
 func run() error {
@@ -36,32 +53,33 @@ func run() error {
 
 	cfg := config.Load()
 
-	containerInterfaces, err := dockeriface.Discover(ctx, cfg.DockerSocket, dockeriface.DiscoverOptions{
-		OnlySeedContainers: cfg.OnlySeedContainers,
-		MaxConcurrency:     cfg.DiscoveryConcurrency,
-	})
-	if err != nil {
-		log.Printf("container interface discovery failed: %v", err)
-	}
-	containerIndex := dockeriface.NewIndex(containerInterfaces)
-	ifaces := cfg.Interfaces
-	if len(ifaces) == 0 {
-		ifaces = containerIndex.HostInterfaceNames()
-	}
-	if len(ifaces) == 0 {
-		ifaces = cfg.FallbackInterfaces
-	}
-
 	filterConfig, err := filter.Parse(cfg.FilterExpr)
 	if err != nil {
 		return fmt.Errorf("parse TRAFFIC_FILTER: %w", err)
 	}
 
-	packetProbe, err := probe.Open(cfg.ObjectPath, ifaces)
+	packetProbe, err := probe.Open(cfg.ObjectPath, nil)
 	if err != nil {
 		return err
 	}
 	defer packetProbe.Close()
+
+	interfaceManager := ifacemanager.New(cfg.DockerSocket, dockeriface.DiscoverOptions{
+		OnlySeedContainers: cfg.OnlySeedContainers,
+		MaxConcurrency:     cfg.DiscoveryConcurrency,
+	}, packetProbe)
+	if len(cfg.Interfaces) > 0 {
+		if err := interfaceManager.SetExplicitInterfaces(cfg.Interfaces); err != nil {
+			return err
+		}
+	} else {
+		snapshot, err := interfaceManager.Refresh(ctx)
+		if err != nil {
+			log.Printf("container interface discovery failed: %v", err)
+		} else if snapshot.Interfaces == "" {
+			log.Printf("no emulator container interfaces discovered at startup; traffic capture will attach after a filter request or manual interface refresh")
+		}
+	}
 
 	if err := control.UpdateFilter(packetProbe.FilterMap(), filterConfig); err != nil {
 		return err
@@ -74,31 +92,47 @@ func run() error {
 		return err
 	}
 	defer eventSink.Close()
-	packetHub := realtime.NewPacketHub()
+	packetHub := realtime.NewPacketHub(control.PacketStreamPath)
 	defer packetHub.Close()
+	pcapRecorder := pcaprecorder.New(cfg.PcapOutputDir, cfg.PcapEnabled)
+	defer pcapRecorder.Close()
+	if err := pcapRecorder.BeginCapture(cfg.FilterExpr); err != nil {
+		return err
+	}
 
 	ifNameByIndex := interfaceNameIndex()
 	timestampBase, err := monotonicTimestampBase()
 	if err != nil {
 		return fmt.Errorf("calculate monotonic timestamp base: %w", err)
 	}
-	controlServer := control.NewServer(
-		ctx,
-		cfg.ControlAddr,
-		packetProbe.FilterMap(),
-		cfg.FilterExpr,
-		control.Route{
-			Pattern: realtime.PacketWebSocketPath,
-			Handler: packetHub,
+	controlServer := control.NewServer(control.ServerOptions{
+		Context:       ctx,
+		Addr:          cfg.ControlAddr,
+		FilterMap:     packetProbe.FilterMap(),
+		InitialFilter: cfg.FilterExpr,
+		BeforeFilterApplied: func(newExpr string) error {
+			snapshot, err := interfaceManager.EnsureReady(ctx)
+			if err != nil {
+				return fmt.Errorf("%w; interfaces=%s discoveredContainerInterfaces=%d", err, snapshot.Interfaces, snapshot.DiscoveredContainerInterface)
+			}
+			log.Printf("traffic interfaces ready for filter %q: interfaces=%s discoveredContainerInterfaces=%d", newExpr, snapshot.Interfaces, snapshot.DiscoveredContainerInterface)
+			return nil
 		},
-	)
+		OnFilterApplied: func(_, newExpr string) error {
+			return pcapRecorder.BeginCapture(newExpr)
+		},
+		PacketStreamHandler: packetHub,
+		PcapHandler:         pcaprecorder.NewControl(pcapRecorder),
+		InterfacesHandler:   ifacemanager.NewControl(interfaceManager),
+	})
 	defer func() {
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()
 		_ = controlServer.Shutdown(shutdownCtx)
 	}()
 
-	log.Printf("traffic observer ready: interfaces=%s discoveredContainerInterfaces=%d filter=%q sink=%s frontendWS=%s%s control=%s", strings.Join(ifaces, ","), len(containerInterfaces), cfg.FilterExpr, eventSink.Name(), cfg.ControlAddr, realtime.PacketWebSocketPath, cfg.ControlAddr)
+	interfaceSnapshot := interfaceManager.Snapshot()
+	log.Printf("traffic observer ready: interfaces=%s discoveredContainerInterfaces=%d filter=%q sink=%s frontendWS=%s%s control=%s pcapEnabled=%t pcapDir=%s", interfaceSnapshot.Interfaces, interfaceSnapshot.DiscoveredContainerInterface, cfg.FilterExpr, eventSink.Name(), cfg.ControlAddr, control.PacketStreamPath, cfg.ControlAddr, cfg.PcapEnabled, cfg.PcapOutputDir)
 
 	go func() {
 		<-ctx.Done()
@@ -122,16 +156,16 @@ func run() error {
 
 		packetTimestamp := timestampBase.Add(time.Duration(raw.TimestampNS))
 		packet := event.FromRaw(raw, ifNameByIndex[raw.IfIndex], packetTimestamp)
-		if containerIface, ok := containerIndex.ByHostIfIndex[raw.IfIndex]; ok {
-			enrichPacket(&packet, containerIface)
+		interfaceManager.EnrichPacket(&packet, raw.IfIndex)
+		syncPacketEndpointIPs(&packet)
+		frontendMessage := realtime.NewPacketMessage(packet)
+		if err := pcapRecorder.Write(packet, raw, frontendMessage); err != nil {
+			log.Printf("packet recorder write failed: %v", err)
 		}
-		enrichPacketEndpoints(&packet, containerIndex)
-		if err := eventSink.Send(ctx, packet); err != nil {
+		if err := eventSink.Send(ctx, frontendMessage); err != nil {
 			log.Printf("send event failed: %v", err)
 		}
-		if err := packetHub.Send(ctx, packet); err != nil {
-			log.Printf("broadcast packet failed: %v", err)
-		}
+		packetHub.Broadcast(frontendMessage)
 	}
 }
 
@@ -145,36 +179,12 @@ func monotonicTimestampBase() (time.Time, error) {
 	return time.Now().Add(-monotonicNow), nil
 }
 
-func enrichPacket(packet *event.Packet, containerIface dockeriface.Interface) {
-	packet.ContainerID = containerIface.ContainerID
-	packet.ContainerName = containerIface.ContainerName
-	packet.NodeID = containerIface.NodeID
-	packet.NodeName = containerIface.NodeName
-	packet.NodeIP = containerIface.ContainerIPv4
-	packet.NodeType = containerIface.NodeType
-	packet.NetworkName = containerIface.NetworkName
-	packet.ContainerIfName = containerIface.ContainerIfName
-	packet.ContainerIPv4 = containerIface.ContainerIPv4
-	packet.ContainerMAC = containerIface.ContainerMAC
-}
-
-func enrichPacketEndpoints(packet *event.Packet, containerIndex dockeriface.Index) {
-	if sourceIface, ok := containerIndex.ByContainerMAC[dockeriface.NormalizeMAC(packet.SourceMAC)]; ok {
-		packet.SourceContainerID = sourceIface.ContainerID
-		packet.SourceContainerName = sourceIface.ContainerName
-		packet.SourceNodeID = sourceIface.NodeID
-		packet.SourceNodeName = sourceIface.NodeName
-		packet.SourceNodeIP = sourceIface.ContainerIPv4
-		packet.SourceNodeType = sourceIface.NodeType
+func syncPacketEndpointIPs(packet *event.Packet) {
+	if packet.SourceNodeIP != "" {
+		packet.SourceIP = packet.SourceNodeIP
 	}
-
-	if destIface, ok := containerIndex.ByContainerMAC[dockeriface.NormalizeMAC(packet.DestMAC)]; ok {
-		packet.DestContainerID = destIface.ContainerID
-		packet.DestContainerName = destIface.ContainerName
-		packet.DestNodeID = destIface.NodeID
-		packet.DestNodeName = destIface.NodeName
-		packet.DestNodeIP = destIface.ContainerIPv4
-		packet.DestNodeType = destIface.NodeType
+	if packet.DestNodeIP != "" {
+		packet.DestIP = packet.DestNodeIP
 	}
 }
 

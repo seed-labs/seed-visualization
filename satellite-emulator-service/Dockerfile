@@ -4,6 +4,6 @@ COPY start.sh /
 RUN chmod +x /start.sh
 WORKDIR /usr/src/app/satellite-emulator-service
 COPY . .
-RUN npm install
+RUN npm i
 RUN ./node_modules/.bin/tsc
 ENTRYPOINT ["sh", "/start.sh"]

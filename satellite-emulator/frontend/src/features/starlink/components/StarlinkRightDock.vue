@@ -25,25 +25,37 @@
           </em>
         </h2>
         <SatelliteList
-          embedded
-          hide-header
-          :active-tab="activeDockListTab"
+          v-if="activeDockPage === 'all'"
           :satellites="satellites"
           :selected-satellites="selectedSatellites"
           :orbit-plane-options="orbitPlaneOptions"
-          :ground-stations="groundStations"
-          :selected-station-ids="selectedStationIds"
-          :connected-station-ids="connectedStationIds"
           :settings="settings"
-          :current-time="currentTime"
-          :selected-id="selectedId"
-          :speed-disabled="speedDisabled"
           @select="starlinkActions.selectSatellite"
+          @update-settings="starlinkActions.updateSettings"
+        />
+
+        <SelectedSatelliteList
+          v-else-if="activeDockPage === 'selected'"
+          :selected-satellites="selectedSatellites"
           @focus-selected="starlinkActions.focusSelectedSatellite"
           @remove="starlinkActions.removeSatellite"
           @remove-all="starlinkActions.removeAllSatellites"
+        />
+
+        <GroundStationList
+          v-else-if="activeDockPage === 'stations'"
+          :ground-stations="groundStations"
+          :selected-station-ids="selectedStationIds"
+          :connected-station-ids="connectedStationIds"
           @station-focus="starlinkActions.stationFocus"
           @station-selection-change="starlinkActions.stationSelectionChange"
+        />
+
+        <StarlinkSettingsPanel
+          v-else-if="activeDockPage === 'settings'"
+          :settings="settings"
+          :current-time="currentTime"
+          :speed-disabled="speedDisabled"
           @update-settings="starlinkActions.updateSettings"
           @set-system-time="starlinkActions.setSystemTime"
           @reset-system-time="starlinkActions.resetSystemTime"
@@ -68,17 +80,30 @@
           :panel-disabled="trafficPanelDisabled"
           :filter-error="filterError"
           :filter-status-text="filterStatusText"
+          :filter-disabled-by-import="filterDisabledByImport"
+          :import-submitting="importSubmitting"
+          :import-error="importError"
+          :import-status-text="importStatusText"
+          :import-disabled-by-filter="importDisabledByFilter"
+          :import-file-active="importFileActive"
           :recording-enabled="recordingEnabled"
           :playback-enabled="playbackEnabled"
           :playback-paused="playbackPaused"
+          :playback-timing-mode="playbackTimingMode"
           :seek-position="seekPosition"
           :seek-max="seekMax"
+          :timeline-window-ms="timelineWindowMs"
+          :timeline-speed="timelineSpeed"
           :range-label="rangeLabel"
           :format-seek-tooltip="formatSeekTooltip"
           @update:filter-input="$emit('update:filterInput', $event)"
           @update:node-search-input="$emit('update:nodeSearchInput', $event)"
+          @update:playback-timing-mode="$emit('update:playbackTimingMode', $event)"
           @update:playback-interval-ms="$emit('update:playbackIntervalMs', $event)"
+          @update:timeline-window-ms="$emit('update:timelineWindowMs', $event)"
+          @update:timeline-speed="$emit('update:timelineSpeed', $event)"
           @submit-filter="trafficActions.submitFilter"
+          @import-replay-file="trafficActions.importReplayFile"
           @select-node-search-result="trafficActions.selectNodeSearchResult"
           @toggle-recording="trafficActions.toggleRecording"
           @toggle-playback="trafficActions.togglePlayback"
@@ -113,7 +138,10 @@
 </template>
 
 <script setup lang="ts">
+import GroundStationList from '@/features/starlink/components/GroundStationList.vue';
 import SatelliteList from '@/features/starlink/components/SatelliteList.vue';
+import SelectedSatelliteList from '@/features/starlink/components/SelectedSatelliteList.vue';
+import StarlinkSettingsPanel from '@/features/starlink/components/StarlinkSettingsPanel.vue';
 import StarlinkShellLegend, {
   type StarlinkShellLegendItem,
 } from '@/features/starlink/components/StarlinkShellLegend.vue';
@@ -144,6 +172,7 @@ export type StarlinkDockActions = {
 
 export type TrafficReplayDockActions = {
   submitFilter: () => void;
+  importReplayFile: (files: File[]) => void;
   selectNodeSearchResult: (containerId: string) => void;
   toggleRecording: () => void;
   togglePlayback: () => void;
@@ -166,11 +195,13 @@ const props = defineProps<{
   connectedStationIds: string[];
   settings: SimulationSettings;
   currentTime: Date;
-  selectedId?: string;
   speedDisabled: boolean;
   filterInput: string;
   nodeSearchInput: string;
+  playbackTimingMode: 'interval' | 'timeline';
   playbackIntervalMs: number;
+  timelineWindowMs: number;
+  timelineSpeed: number;
   packetCount: number;
   nodeSearchKeyword: string;
   nodeSearchResultsCount: number;
@@ -179,6 +210,12 @@ const props = defineProps<{
   trafficPanelDisabled: boolean;
   filterError: string;
   filterStatusText: string;
+  filterDisabledByImport: boolean;
+  importSubmitting: boolean;
+  importError: string;
+  importStatusText: string;
+  importDisabledByFilter: boolean;
+  importFileActive: boolean;
   recordingEnabled: boolean;
   playbackEnabled: boolean;
   playbackPaused: boolean;
@@ -193,7 +230,10 @@ const props = defineProps<{
 defineEmits<{
   'update:filterInput': [value: string];
   'update:nodeSearchInput': [value: string];
+  'update:playbackTimingMode': [value: 'interval' | 'timeline'];
   'update:playbackIntervalMs': [value: number];
+  'update:timelineWindowMs': [value: number];
+  'update:timelineSpeed': [value: number];
 }>();
 
 const dockPageDefinitions: Array<{ id: DockPage; label: string }> = [
@@ -212,7 +252,6 @@ const {
   dockPages,
   activeDockPageLabel,
   activeDockPageCount,
-  activeDockListTab,
   toggleDockCollapsed,
   toggleDockPageMenu,
   selectDockPage,

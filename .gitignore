@@ -29,4 +29,10 @@ components.d.ts
 pubulic/
 tsconfig.tsbuildinfo
 .agents
-links.json
+.tmp-go-cache*
+test-results/
+playwright-report/
+bin
+__pycache__
+*.pcap
+traffic-observer-service/pcap/

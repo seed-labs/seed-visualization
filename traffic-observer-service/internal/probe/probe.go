@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"strings"
+	"sync"
 
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/link"
@@ -13,10 +14,12 @@ import (
 )
 
 type Probe struct {
+	mu         sync.RWMutex
 	collection *ebpf.Collection
 	reader     *ringbuf.Reader
 	filterMap  *ebpf.Map
 	links      []link.Link
+	interfaces []string
 }
 
 func Open(objectPath string, interfaces []string) (*Probe, error) {
@@ -40,25 +43,23 @@ func Open(objectPath string, interfaces []string) (*Probe, error) {
 		return nil, err
 	}
 
-	links, err := attachPrograms(collection, interfaces)
-	if err != nil {
-		collection.Close()
-		return nil, err
-	}
-
 	reader, err := ringbuf.NewReader(collection.Maps["events"])
 	if err != nil {
-		closeLinks(links)
 		collection.Close()
 		return nil, fmt.Errorf("open ring buffer: %w", err)
 	}
 
-	return &Probe{
+	probe := &Probe{
 		collection: collection,
 		reader:     reader,
 		filterMap:  filterMap,
-		links:      links,
-	}, nil
+	}
+	if err := probe.ReplaceInterfaces(interfaces); err != nil {
+		probe.Close()
+		return nil, err
+	}
+
+	return probe, nil
 }
 
 func (p *Probe) Reader() *ringbuf.Reader {
@@ -70,6 +71,9 @@ func (p *Probe) FilterMap() *ebpf.Map {
 }
 
 func (p *Probe) Close() error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
 	var closeErr error
 	if p.reader != nil {
 		closeErr = errors.Join(closeErr, p.reader.Close())
@@ -79,6 +83,44 @@ func (p *Probe) Close() error {
 		p.collection.Close()
 	}
 	return closeErr
+}
+
+func (p *Probe) ReplaceInterfaces(names []string) error {
+	names = uniqueInterfaceNames(names)
+
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	if sameInterfaceSet(p.interfaces, names) {
+		p.interfaces = names
+		return nil
+	}
+
+	closeErr := closeLinks(p.links)
+	p.links = nil
+	p.interfaces = nil
+
+	links, err := attachPrograms(p.collection, names)
+	if err != nil {
+		closeLinks(links)
+		return err
+	}
+
+	p.links = links
+	p.interfaces = names
+	return closeErr
+}
+
+func (p *Probe) InterfaceCount() int {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	return len(p.interfaces)
+}
+
+func (p *Probe) InterfaceNames() []string {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	return append([]string(nil), p.interfaces...)
 }
 
 func IsReaderClosed(err error) bool {
@@ -133,6 +175,40 @@ func attachPrograms(collection *ebpf.Collection, names []string) ([]link.Link, e
 	}
 
 	return attached, nil
+}
+
+func uniqueInterfaceNames(names []string) []string {
+	seen := map[string]struct{}{}
+	out := make([]string, 0, len(names))
+	for _, name := range names {
+		name = strings.TrimSpace(name)
+		if name == "" {
+			continue
+		}
+		if _, ok := seen[name]; ok {
+			continue
+		}
+		seen[name] = struct{}{}
+		out = append(out, name)
+	}
+	return out
+}
+
+func sameInterfaceSet(left []string, right []string) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	counts := map[string]int{}
+	for _, name := range left {
+		counts[name]++
+	}
+	for _, name := range right {
+		counts[name]--
+		if counts[name] < 0 {
+			return false
+		}
+	}
+	return true
 }
 
 func closeLinks(links []link.Link) error {

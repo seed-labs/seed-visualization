@@ -1,7 +1,7 @@
-import plannedShellOrbitData from '../../../../../tmp/planned_shell_orbit.json';
+import request from '@/utils/request';
 import type { PlannedOrbitRecord } from '@/features/starlink/types';
 
-type PlannedShellOrbitRecordJson = {
+export type PlannedShellOrbitRecordJson = {
   argument_of_perigee_deg: number;
   eccentricity: number;
   epoch_utc: string;
@@ -16,7 +16,7 @@ type PlannedShellOrbitRecordJson = {
   satellite_name: string;
 };
 
-type PlannedShellOrbitDataJson = {
+export type PlannedShellOrbitDataJson = {
   selected_records?: PlannedShellOrbitRecordJson[];
   shell_selection?: {
     plane_manifest?: Array<{
@@ -24,6 +24,11 @@ type PlannedShellOrbitDataJson = {
       plane_id: string;
     }>;
   };
+};
+
+type ApiResponse<Result> = {
+  ok: boolean;
+  result: Result;
 };
 
 function isPlannedShellOrbitRecord(value: unknown): value is PlannedShellOrbitRecordJson {
@@ -67,9 +72,17 @@ function toPlannedOrbitRecord(
   };
 }
 
-export function parsePlannedOrbitRecords(
-  data: PlannedShellOrbitDataJson = plannedShellOrbitData,
-): PlannedOrbitRecord[] {
+export async function fetchPlannedShellOrbitData(): Promise<PlannedShellOrbitDataJson> {
+  const response = await request.get('/satellite/planned-shell-orbit') as unknown as ApiResponse<PlannedShellOrbitDataJson>;
+
+  if (!response.ok || !response.result || typeof response.result !== 'object') {
+    throw new Error('Failed to load planned shell orbit data.');
+  }
+
+  return response.result;
+}
+
+export function parsePlannedOrbitRecords(data: PlannedShellOrbitDataJson): PlannedOrbitRecord[] {
   const records = data.selected_records ?? [];
 
   if (!records.every(isPlannedShellOrbitRecord)) {

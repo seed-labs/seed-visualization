@@ -59,3 +59,7 @@ flowchart LR
   ContainerSvc -->|"GET /container"| Emulator
   TrafficSvc -->|"GET/PUT /filter<br/>WS /ws/packets"| Traffic
 ```
+
+## 测试覆盖
+
+Mermaid 测试覆盖图见 [satellite-emulator-testing.md](./test/satellite-emulator-testing.md)。

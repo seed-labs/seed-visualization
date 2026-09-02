@@ -3,7 +3,7 @@ import type {
   SatelliteGroundLink,
   SatellitePoint,
 } from '@/features/starlink/types';
-import { emulatorRequest } from '@/utils/request';
+import request from '@/utils/request';
 import { mockGroundStations } from '@/features/starlink/services/mockGroundStations';
 
 export { mockGroundStations };
@@ -17,20 +17,13 @@ type ApiResponse<Result> = {
   result: Result;
 };
 
-type EmulatorNetwork = {
-  Id: string;
-  Name?: string;
-  meta?: {
-    emulatorInfo?: {
-      type?: string;
-      scope?: string;
-      name?: string;
-      displayname?: string;
-      description?: string;
-      longitude?: string;
-      latitude?: string;
-    };
-  };
+type StarlinkGatewayJson = {
+  altitudeMeters?: number;
+  city?: string;
+  id?: string;
+  latitude?: number;
+  longitude?: number;
+  name?: string;
 };
 
 function readCoordinate(value: string | number | undefined) {
@@ -46,44 +39,38 @@ function isValidCoordinate(longitude: number, latitude: number) {
   return Math.abs(longitude) <= 180 && Math.abs(latitude) <= 90;
 }
 
-function isStarNetwork(network: EmulatorNetwork) {
-  return network.meta?.emulatorInfo?.type?.toLowerCase() === 'global';
-}
-
-function toGroundStation(network: EmulatorNetwork): GroundStation | undefined {
-  const info = network.meta?.emulatorInfo;
-  const longitude = readCoordinate(info?.longitude);
-  const latitude = readCoordinate(info?.latitude);
+function toGroundStation(gateway: StarlinkGatewayJson): GroundStation | undefined {
+  const longitude = readCoordinate(gateway.longitude);
+  const latitude = readCoordinate(gateway.latitude);
 
   if (longitude === undefined || latitude === undefined || !isValidCoordinate(longitude, latitude)) {
     return undefined;
   }
 
-  const name = info?.displayname || info?.name || network.Name || network.Id.slice(0, 12);
+  if (!gateway.id) {
+    return undefined;
+  }
 
   return {
-    id: network.Id,
-    name,
-    city: info?.displayname || info?.scope || info?.name || 'Star node',
+    id: gateway.id,
+    name: gateway.name || gateway.id,
+    city: gateway.city || gateway.name || gateway.id,
     longitude,
     latitude,
-    altitudeMeters: 0,
+    altitudeMeters: Number.isFinite(gateway.altitudeMeters) ? gateway.altitudeMeters! : 0,
   };
 }
 
 export async function fetchGroundStationsFromEmulator(): Promise<GroundStation[]> {
-  return mockGroundStations
+  const response = await request.get('/satellite/starlink-gateways') as unknown as ApiResponse<StarlinkGatewayJson[]>;
 
-  // const response = await emulatorRequest.get('/network') as unknown as ApiResponse<EmulatorNetwork[]>;
-  
-  // if (!response.ok || !Array.isArray(response.result)) {
-  //   throw new Error('Failed to load emulator star nodes.');
-  // }
-  
-  // return response.result
-  //   .filter(isStarNetwork)
-  //   .map(toGroundStation)
-  //   .filter((station): station is GroundStation => Boolean(station));
+  if (!response.ok || !Array.isArray(response.result)) {
+    throw new Error('Failed to load Starlink gateways.');
+  }
+
+  return response.result
+    .map(toGroundStation)
+    .filter((station): station is GroundStation => Boolean(station));
 }
 
 function toEcef(longitude: number, latitude: number, altitudeKm: number) {

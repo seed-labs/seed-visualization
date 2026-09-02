@@ -26,3 +26,7 @@ flowchart LR
 ## 说明
 
 Internet Map 不再包含独立 backend。所有通用仿真器 API 统一走 `emulator-service`。
+
+## 测试覆盖
+
+Mermaid 测试覆盖图见 [internet-map-testing.md](./test/internet-map-testing.md)。

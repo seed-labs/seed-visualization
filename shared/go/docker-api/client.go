@@ -24,11 +24,11 @@ type ContainerListItem struct {
 }
 
 type ContainerInspect struct {
-	ID              string           `json:"Id"`
-	Name            string           `json:"Name"`
-	Config          ContainerConfig  `json:"Config"`
-	State           ContainerState   `json:"State"`
-	HostConfig      HostConfig       `json:"HostConfig"`
+	ID              string          `json:"Id"`
+	Name            string          `json:"Name"`
+	Config          ContainerConfig `json:"Config"`
+	State           ContainerState  `json:"State"`
+	HostConfig      HostConfig      `json:"HostConfig"`
 	NetworkSettings NetworkSettings `json:"NetworkSettings"`
 }
 
@@ -49,8 +49,18 @@ type NetworkSettings struct {
 }
 
 type EndpointSettings struct {
-	IPAddress  string `json:"IPAddress"`
-	MacAddress string `json:"MacAddress"`
+	IPAddress  string   `json:"IPAddress"`
+	MacAddress string   `json:"MacAddress"`
+	NetworkID  string   `json:"NetworkID"`
+	EndpointID string   `json:"EndpointID"`
+	Gateway    string   `json:"Gateway"`
+	Aliases    []string `json:"Aliases"`
+}
+
+type NetworkListItem struct {
+	ID     string            `json:"Id"`
+	Name   string            `json:"Name"`
+	Labels map[string]string `json:"Labels"`
 }
 
 func New(socketPath string) *Client {
@@ -87,6 +97,14 @@ func (c *Client) InspectContainer(ctx context.Context, id string) (ContainerInsp
 		return inspect, fmt.Errorf("inspect docker container %s: %w", ShortID(id), err)
 	}
 	return inspect, nil
+}
+
+func (c *Client) ListNetworks(ctx context.Context) ([]NetworkListItem, error) {
+	var networks []NetworkListItem
+	if err := c.getJSON(ctx, "/networks", &networks); err != nil {
+		return nil, fmt.Errorf("list docker networks: %w", err)
+	}
+	return networks, nil
 }
 
 func (c *Client) getJSON(ctx context.Context, path string, out any) error {

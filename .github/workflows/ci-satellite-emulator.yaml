@@ -1,0 +1,133 @@
+name: CI Satellite Emulator Frontend
+
+on:
+  # pull_request:
+  #   branches:
+  #     - main
+  #   paths:
+  #     - "satellite-emulator/**"
+  #     - "docker-compose.yml"
+  #     - ".github/workflows/ci-satellite-emulator.yaml"
+  # push:
+  #   branches:
+  #     - main
+  #   paths:
+  #     - "satellite-emulator/**"
+  #     - "docker-compose.yml"
+  #     - ".github/workflows/ci-satellite-emulator.yaml"
+  workflow_call:
+    inputs:
+      run-static-checks:
+        type: boolean
+        required: false
+        default: true
+      run-unit-tests:
+        type: boolean
+        required: false
+        default: true
+      run-e2e-tests:
+        type: boolean
+        required: false
+        default: true
+      run-docker-build:
+        type: boolean
+        required: false
+        default: true
+  workflow_dispatch:
+    inputs:
+      run-static-checks:
+        description: "Run static checks"
+        type: boolean
+        required: false
+        default: true
+      run-unit-tests:
+        description: "Run unit tests"
+        type: boolean
+        required: false
+        default: true
+      run-e2e-tests:
+        description: "Run browser E2E tests"
+        type: boolean
+        required: false
+        default: true
+      run-docker-build:
+        description: "Build Docker image"
+        type: boolean
+        required: false
+        default: true
+
+env:
+  NODE_VERSION: "22"
+  PNPM_VERSION: "9.15.9"
+
+jobs:
+  satellite-emulator:
+    name: Satellite Emulator Frontend
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: satellite-emulator/frontend
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        if: ${{ github.event_name != 'workflow_dispatch' || inputs.run-static-checks }}
+        run: pnpm run lint
+
+      - name: Unit tests
+        if: ${{ github.event_name != 'workflow_dispatch' || inputs.run-unit-tests }}
+        env:
+          TEST_COVERAGE_SCOPE: |
+            - composables: Starlink state synchronization, traffic replay state, timeline event state, and dashboard interaction helpers.
+            - services: satellite data loading, satellite shell styling, ground station services, traffic observer API calls, and emulator container services.
+            - Cesium adapters: satellite, ground station, traffic container, label, hover detail, and scene update helper behavior under mocked Cesium objects.
+        run: pnpm run test:unit
+
+      - name: Build
+        run: pnpm run build
+
+      - name: Install Playwright browser
+        if: ${{ github.event_name != 'workflow_dispatch' || inputs.run-e2e-tests }}
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: E2E tests
+        if: ${{ github.event_name != 'workflow_dispatch' || inputs.run-e2e-tests }}
+        env:
+          TEST_COVERAGE_SCOPE: |
+            - Dashboard bootstrap: mocked satellite orbit data, gateway data, containers, and WebSocket startup.
+            - Right dock tabs: Starlink Shells, Satellites, Selected, Stations, Traffic Replay, and Settings navigation.
+            - Satellite filters: name/NORAD search, inverted search, altitude range, inverted altitude, shell-plane linkage, and selected-plane clearing.
+            - Ground stations: search, select all, invert selection, selected styling, and station visibility behavior.
+            - Settings: label visibility, hover details, satellite visibility, ground station visibility, system-time controls, and speed disabling while traffic capture is active.
+            - Timeline Events: timeline expand/collapse, event list rendering, apply/reset TimeEvent entries, and event details.
+            - Traffic Replay: filter submission, recording guardrails, packet recording, playback, pause, jump, seek, stop, clear, and container-node search.
+            - Real Cesium smoke test: real 3D globe canvas initialization with UI overlays still usable.
+        run: pnpm run test:e2e
+
+      - name: Upload Playwright report
+        if: ${{ always() && (github.event_name != 'workflow_dispatch' || inputs.run-e2e-tests) }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: satellite-emulator-playwright-report
+          path: satellite-emulator/frontend/playwright-report
+
+      - name: Docker build
+        if: ${{ github.event_name != 'workflow_dispatch' || inputs.run-docker-build }}
+        working-directory: .
+        run: docker compose build seedemu_satellite_emulator

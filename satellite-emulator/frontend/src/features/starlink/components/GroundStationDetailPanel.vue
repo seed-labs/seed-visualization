@@ -1,29 +1,19 @@
 <template>
-  <section
+  <AnchoredDetailPanel
     v-if="visible && station"
-    ref="panelRef"
-    class="satellite-detail-panel"
-    :style="panelStyle"
-  >
-    <header @pointerdown="startDrag">
-      <span>{{ station.name }}</span>
-      <button type="button" aria-label="Close station details" @click="$emit('close')">x</button>
-    </header>
-
-    <div class="satellite-detail">
-      <dl>
-        <div v-for="row in rows" :key="row.label">
-          <dt>{{ row.label }}</dt>
-          <dd>{{ row.value }}</dd>
-        </div>
-      </dl>
-    </div>
-  </section>
+    :visible="visible"
+    :title="station.name"
+    :rows="rows"
+    :anchor="anchor"
+    :identity="station.id"
+    close-label="Close station details"
+    @close="$emit('close')"
+  />
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { useAnchoredDetailPanel } from '@/features/starlink/composables/useAnchoredDetailPanel';
+import AnchoredDetailPanel from '@/features/starlink/components/AnchoredDetailPanel.vue';
 import type { GroundStation, SatelliteDetailRow, ScreenAnchor } from '@/features/starlink/types';
 
 const props = defineProps<{
@@ -47,11 +37,4 @@ const rows = computed<SatelliteDetailRow[]>(() =>
       ]
     : [],
 );
-const { panelRef, panelStyle, startDrag } = useAnchoredDetailPanel({
-  anchor: () => props.anchor,
-  active: () => props.visible && Boolean(props.station),
-  identity: () => props.station?.id,
-});
 </script>
-
-<style scoped lang="scss" src="@/features/starlink/styles/satellite-detail-panel.scss"></style>

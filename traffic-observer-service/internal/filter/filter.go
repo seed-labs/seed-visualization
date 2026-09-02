@@ -21,18 +21,18 @@ const (
 
 // Config must stay layout-compatible with struct filter_config in bpf/packet_trace.h.
 type Config struct {
-	Enabled       uint8
-	IPProto       uint8
-	Direction     uint8
-	MatchSrcIP    uint8
-	MatchDstIP    uint8
-	MatchSrcPort  uint8
-	MatchDstPort  uint8
-	Reserved      uint8
-	SrcIP         uint32
-	DstIP         uint32
-	SrcPort       uint16
-	DstPort       uint16
+	Enabled      uint8
+	IPProto      uint8
+	Direction    uint8
+	MatchSrcIP   uint8
+	MatchDstIP   uint8
+	MatchSrcPort uint8
+	MatchDstPort uint8
+	Reserved     uint8
+	SrcIP        uint32
+	DstIP        uint32
+	SrcPort      uint16
+	DstPort      uint16
 }
 
 func Parse(expr string) (Config, error) {

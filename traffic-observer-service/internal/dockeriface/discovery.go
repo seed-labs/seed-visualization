@@ -27,11 +27,29 @@ type SeedNodeMeta struct {
 	Latitude    string
 }
 
+type SeedNetMeta struct {
+	Name        string
+	Scope       string
+	Type        string
+	Prefix      string
+	DisplayName string
+	Description string
+	Longitude   string
+	Latitude    string
+}
+
 type seedContainerInfo struct {
 	ID     string
 	Names  []string
 	Labels map[string]string
 	Meta   SeedNodeMeta
+}
+
+type seedNetworkInfo struct {
+	ID     string
+	Name   string
+	Labels map[string]string
+	Meta   SeedNetMeta
 }
 
 type Interface struct {
@@ -40,9 +58,12 @@ type Interface struct {
 	ContainerPID     int               `json:"containerPid"`
 	NodeID           string            `json:"nodeId,omitempty"`
 	NodeName         string            `json:"nodeName,omitempty"`
+	NodeLabel        string            `json:"nodeLabel,omitempty"`
 	NodeType         string            `json:"nodeType,omitempty"`
 	Labels           map[string]string `json:"labels,omitempty"`
+	NetworkID        string            `json:"networkId,omitempty"`
 	NetworkName      string            `json:"networkName,omitempty"`
+	NetworkLabel     string            `json:"networkLabel,omitempty"`
 	ContainerIfName  string            `json:"containerIfName"`
 	ContainerIfIndex int               `json:"containerIfIndex"`
 	ContainerIfLink  int               `json:"containerIfLink"`
@@ -53,9 +74,10 @@ type Interface struct {
 }
 
 type Index struct {
-	ByHostIfIndex  map[uint32]Interface
-	ByHostIfName   map[string]Interface
-	ByContainerMAC map[string]Interface
+	ByHostIfIndex   map[uint32]Interface
+	ByHostIfName    map[string]Interface
+	ByContainerMAC  map[string]Interface
+	ByContainerIPv4 map[string]Interface
 }
 
 type DiscoverOptions struct {
@@ -65,15 +87,19 @@ type DiscoverOptions struct {
 
 func NewIndex(interfaces []Interface) Index {
 	index := Index{
-		ByHostIfIndex:  map[uint32]Interface{},
-		ByHostIfName:   map[string]Interface{},
-		ByContainerMAC: map[string]Interface{},
+		ByHostIfIndex:   map[uint32]Interface{},
+		ByHostIfName:    map[string]Interface{},
+		ByContainerMAC:  map[string]Interface{},
+		ByContainerIPv4: map[string]Interface{},
 	}
 	for _, item := range interfaces {
 		index.ByHostIfIndex[uint32(item.HostIfIndex)] = item
 		index.ByHostIfName[item.HostIfName] = item
 		if item.ContainerMAC != "" {
 			index.ByContainerMAC[NormalizeMAC(item.ContainerMAC)] = item
+		}
+		if item.ContainerIPv4 != "" {
+			index.ByContainerIPv4[item.ContainerIPv4] = item
 		}
 	}
 	return index
@@ -106,6 +132,11 @@ func Discover(ctx context.Context, socketPath string, opts DiscoverOptions) ([]I
 		return nil, err
 	}
 	seedContainers := getContainers(containers, opts.OnlySeedContainers)
+	seedNetworks := []seedNetworkInfo{}
+	if networks, err := client.ListNetworks(ctx); err == nil {
+		seedNetworks = getNetworks(networks)
+	}
+	networkIndex := newNetworkIndex(seedNetworks)
 
 	hostInterfaces, err := hostInterfacesByIndex()
 	if err != nil {
@@ -143,7 +174,7 @@ func Discover(ctx context.Context, socketPath string, opts DiscoverOptions) ([]I
 				return
 			}
 
-			items, err := discoverContainerInterfaces(ctx, client, container, hostInterfaces)
+			items, err := discoverContainerInterfaces(ctx, client, container, hostInterfaces, networkIndex)
 			mu.Lock()
 			defer mu.Unlock()
 			if err != nil && firstErr == nil {
@@ -166,6 +197,7 @@ func discoverContainerInterfaces(
 	client *dockerapi.Client,
 	container seedContainerInfo,
 	hostInterfaces map[int]hostInterface,
+	networkIndex map[string]seedNetworkInfo,
 ) ([]Interface, error) {
 	inspect, err := client.InspectContainer(ctx, container.ID)
 	if err != nil {
@@ -194,21 +226,25 @@ func discoverContainerInterfaces(
 			continue
 		}
 
-		networkName, ipv4 := matchDockerNetwork(containerIface.MAC, inspect.NetworkSettings.Networks)
+		networkEndpoint := matchDockerNetwork(containerIface.MAC, inspect.NetworkSettings.Networks)
+		network := networkIndex[networkEndpoint.NetworkID]
 		result = append(result, Interface{
 			ContainerID:      inspect.ID,
 			ContainerName:    cleanContainerName(inspect.Name, container.Names),
 			ContainerPID:     inspect.State.Pid,
 			NodeID:           container.Meta.Name,
 			NodeName:         nodeDisplayName(container.Meta),
+			NodeLabel:        nodeLabel(container.Meta),
 			NodeType:         container.Meta.Role,
 			Labels:           container.Labels,
-			NetworkName:      networkName,
+			NetworkID:        networkEndpoint.NetworkID,
+			NetworkName:      networkEndpoint.Name,
+			NetworkLabel:     networkLabel(network, networkEndpoint.Name),
 			ContainerIfName:  containerIface.Name,
 			ContainerIfIndex: containerIface.IfIndex,
 			ContainerIfLink:  containerIface.IfLink,
 			ContainerMAC:     containerIface.MAC,
-			ContainerIPv4:    ipv4,
+			ContainerIPv4:    networkEndpoint.IPv4,
 			HostIfName:       hostIface.Name,
 			HostIfIndex:      hostIface.IfIndex,
 		})
@@ -222,6 +258,26 @@ func nodeDisplayName(meta SeedNodeMeta) string {
 		return strings.TrimSpace(meta.DisplayName)
 	}
 	return strings.TrimSpace(meta.Name)
+}
+
+func nodeLabel(meta SeedNodeMeta) string {
+	if strings.TrimSpace(meta.DisplayName) != "" {
+		return strings.TrimSpace(meta.DisplayName)
+	}
+	if meta.ASN != 0 && strings.TrimSpace(meta.Name) != "" {
+		return fmt.Sprintf("%d/%s", meta.ASN, strings.TrimSpace(meta.Name))
+	}
+	return strings.TrimSpace(meta.Name)
+}
+
+func networkLabel(network seedNetworkInfo, fallbackName string) string {
+	if strings.TrimSpace(network.Meta.DisplayName) != "" {
+		return strings.TrimSpace(network.Meta.DisplayName)
+	}
+	if strings.TrimSpace(network.Meta.Scope) != "" && strings.TrimSpace(network.Meta.Name) != "" {
+		return strings.TrimSpace(network.Meta.Scope) + "/" + strings.TrimSpace(network.Meta.Name)
+	}
+	return strings.TrimSpace(fallbackName)
 }
 
 func isUnsupportedNetworkMode(mode string) bool {
@@ -242,6 +298,41 @@ func getContainers(containers []dockerapi.ContainerListItem, onlySeedContainers 
 		result = append(result, withMeta)
 	}
 	return result
+}
+
+func getNetworks(networks []dockerapi.NetworkListItem) []seedNetworkInfo {
+	result := make([]seedNetworkInfo, 0, len(networks))
+	for _, network := range networks {
+		labels := network.Labels
+		if labels == nil {
+			labels = map[string]string{}
+		}
+
+		withMeta := seedNetworkInfo{
+			ID:     network.ID,
+			Name:   network.Name,
+			Labels: labels,
+			Meta:   parseSeedNetMeta(labels),
+		}
+		if withMeta.Meta.Name == "" {
+			continue
+		}
+		result = append(result, withMeta)
+	}
+	return result
+}
+
+func newNetworkIndex(networks []seedNetworkInfo) map[string]seedNetworkInfo {
+	index := map[string]seedNetworkInfo{}
+	for _, network := range networks {
+		if network.ID != "" {
+			index[network.ID] = network
+		}
+		if network.Name != "" {
+			index[network.Name] = network
+		}
+	}
+	return index
 }
 
 func toSeedContainerInfo(container dockerapi.ContainerListItem) seedContainerInfo {
@@ -289,6 +380,36 @@ func parseSeedNodeMeta(labels map[string]string) SeedNodeMeta {
 		}
 	}
 	return node
+}
+
+func parseSeedNetMeta(labels map[string]string) SeedNetMeta {
+	var network SeedNetMeta
+	for label, value := range labels {
+		if !strings.HasPrefix(label, seedMetaPrefix) {
+			continue
+		}
+
+		key := strings.TrimPrefix(label, seedMetaPrefix)
+		switch key {
+		case "name":
+			network.Name = value
+		case "scope":
+			network.Scope = value
+		case "type":
+			network.Type = value
+		case "prefix":
+			network.Prefix = value
+		case "displayname":
+			network.DisplayName = value
+		case "description":
+			network.Description = value
+		case "geo.lon":
+			network.Longitude = value
+		case "geo.lat":
+			network.Latitude = value
+		}
+	}
+	return network
 }
 
 type hostInterface struct {
@@ -383,16 +504,26 @@ func readIntFile(path string) (int, error) {
 	return strconv.Atoi(strings.TrimSpace(string(data)))
 }
 
-func matchDockerNetwork(mac string, networks map[string]dockerapi.EndpointSettings) (string, string) {
+type dockerNetworkEndpoint struct {
+	Name      string
+	NetworkID string
+	IPv4      string
+}
+
+func matchDockerNetwork(mac string, networks map[string]dockerapi.EndpointSettings) dockerNetworkEndpoint {
 	if mac == "" {
-		return "", ""
+		return dockerNetworkEndpoint{}
 	}
 	for name, endpoint := range networks {
 		if strings.EqualFold(endpoint.MacAddress, mac) {
-			return name, endpoint.IPAddress
+			return dockerNetworkEndpoint{
+				Name:      name,
+				NetworkID: endpoint.NetworkID,
+				IPv4:      endpoint.IPAddress,
+			}
 		}
 	}
-	return "", ""
+	return dockerNetworkEndpoint{}
 }
 
 func cleanContainerName(inspectName string, names []string) string {

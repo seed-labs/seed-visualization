@@ -1,0 +1,111 @@
+name: CI Satellite Emulator Service
+
+on:
+  # pull_request:
+  #   branches:
+  #     - main
+  #   paths:
+  #     - "satellite-emulator-service/**"
+  #     - "docker-compose.yml"
+  #     - ".github/workflows/ci-satellite-emulator-service.yaml"
+  # push:
+  #   branches:
+  #     - main
+  #   paths:
+  #     - "satellite-emulator-service/**"
+  #     - "docker-compose.yml"
+  #     - ".github/workflows/ci-satellite-emulator-service.yaml"
+  workflow_call:
+    inputs:
+      run-static-checks:
+        type: boolean
+        required: false
+        default: true
+      run-unit-tests:
+        type: boolean
+        required: false
+        default: true
+      run-integration-tests:
+        type: boolean
+        required: false
+        default: true
+      run-docker-build:
+        type: boolean
+        required: false
+        default: true
+  workflow_dispatch:
+    inputs:
+      run-static-checks:
+        description: "Run static checks"
+        type: boolean
+        required: false
+        default: true
+      run-unit-tests:
+        description: "Run unit tests"
+        type: boolean
+        required: false
+        default: true
+      run-integration-tests:
+        description: "Run lightweight integration tests"
+        type: boolean
+        required: false
+        default: true
+      run-docker-build:
+        description: "Build Docker image"
+        type: boolean
+        required: false
+        default: true
+
+env:
+  NODE_VERSION: "22"
+
+jobs:
+  satellite-emulator-service:
+    name: Satellite Emulator Service
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: satellite-emulator-service
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        if: ${{ github.event_name != 'workflow_dispatch' || inputs.run-static-checks }}
+        run: npm run lint
+
+      - name: Unit tests
+        if: ${{ github.event_name != 'workflow_dispatch' || inputs.run-unit-tests }}
+        env:
+          TEST_COVERAGE_SCOPE: |
+            - satellite position helpers: finite ECI/LLA-derived coordinates and positive orbital speed calculation.
+            - orbit polyline helpers: generated orbit sample metadata and speed metadata propagation.
+            - ground-link helpers: satellite position validation, gateway validation, nearest gateway selection, range filtering, and selected-satellite limiting.
+        run: npm run test:unit
+
+      - name: Integration tests
+        if: ${{ github.event_name != 'workflow_dispatch' || inputs.run-integration-tests }}
+        env:
+          TEST_COVERAGE_SCOPE: |
+            - static satellite API: planned shell orbit data and Starlink gateway data responses.
+            - link ingestion API: default satellite link file posting, explicit tmp file posting, path traversal rejection, malformed body rejection, and missing/legacy network link rejection.
+            - persistence and broadcast path: accepted link payloads are stored and emitted through the satellite API integration path.
+        run: npm run test:integration
+
+      - name: Build
+        run: npm run build
+
+      - name: Docker build
+        if: ${{ github.event_name != 'workflow_dispatch' || inputs.run-docker-build }}
+        working-directory: .
+        run: docker compose build seedemu_satellite_emulator_service

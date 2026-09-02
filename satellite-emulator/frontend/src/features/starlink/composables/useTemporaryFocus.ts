@@ -1,6 +1,6 @@
 import { nextTick, ref } from 'vue';
 
-export function useTemporaryFocus(durationMs: number) {
+export function useTemporaryFocus(durationMs: number, stationDurationMs = durationMs) {
   const focusedSatelliteId = ref<string>();
   const focusedStationId = ref<string>();
   let satelliteClearTimer: number | undefined;
@@ -35,7 +35,7 @@ export function useTemporaryFocus(durationMs: number) {
         focusedStationId.value = undefined;
       }
       stationClearTimer = undefined;
-    }, durationMs);
+    }, stationDurationMs);
   }
 
   function disposeTemporaryFocus() {

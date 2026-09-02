@@ -385,7 +385,7 @@ defineExpose({mapUi})
 </script>
 
 <template>
-  <el-col :span="24" class="tabs-panel panel">
+  <el-col :span="24" class="tabs-panel panel" data-testid="base-map-tabs">
     <el-tabs
         v-model="inputActiveName"
         type="card"
@@ -394,6 +394,7 @@ defineExpose({mapUi})
     >
       <el-tab-pane label="Filter" name="filter">
         <el-input
+            data-testid="base-map-filter-input"
             v-model="inputFilter"
             placeholder="Type a BPF expression to animate packet flows on the map..."
             class="input-with-select"
@@ -401,12 +402,13 @@ defineExpose({mapUi})
             @click="filterClick"
         >
           <template #prepend>
-            <el-button type="primary" class="submit" @click="onSubmitFilter">Submit</el-button>
+            <el-button data-testid="base-map-filter-submit" type="primary" class="submit" @click="onSubmitFilter">Submit</el-button>
           </template>
         </el-input>
       </el-tab-pane>
       <el-tab-pane label="Search" name="search">
         <el-input
+            data-testid="base-map-search-input"
             v-model="inputSearch"
             placeholder="Search networks and nodes..."
             class="input-with-select"
@@ -414,7 +416,7 @@ defineExpose({mapUi})
             @input="searchInput"
         >
           <template #prepend>
-            <el-button type="primary" class="submit" @click="onSubmitSearch">Submit</el-button>
+            <el-button data-testid="base-map-search-submit" type="primary" class="submit" @click="onSubmitSearch">Submit</el-button>
           </template>
         </el-input>
       </el-tab-pane>
@@ -423,9 +425,9 @@ defineExpose({mapUi})
     </el-tabs>
   </el-col>
   <div class="map-area">
-    <div class="map" id="map"></div>
+    <div class="map" id="map" data-testid="base-map-canvas"></div>
     <div class="panel log-panel" id="log-panel">
-      <el-button id="log-panel-toggle" :icon="logBtnClick ? ArrowUpBold : ArrowDownBold"
+      <el-button id="log-panel-toggle" data-testid="base-map-log-toggle" :icon="logBtnClick ? ArrowUpBold : ArrowDownBold"
                  @click="logBtnClick = !logBtnClick">Log
       </el-button>
       <div class="log-wrap wrap minimized" id="log-wrap">
@@ -478,7 +480,7 @@ defineExpose({mapUi})
         type="card"
         class="tabs dialog-tabs"
     >
-      <el-tab-pane label="Settings" name="settings">
+      <el-tab-pane label="Settings" name="settings" data-testid="base-map-settings-tab">
         <el-form-item label="Drag Fixed" prop="dragFixed" label-width="150px">
           <el-switch v-model="ruleForm.dragFixed" @change="onDragFixedChange"/>
         </el-form-item>
@@ -491,7 +493,7 @@ defineExpose({mapUi})
           </el-checkbox-group>
         </el-form-item>
       </el-tab-pane>
-      <el-tab-pane label="Replay" name="replay">
+      <el-tab-pane label="Replay" name="replay" data-testid="base-map-replay-tab">
         <div class="replay-plate-wrap wrap">
           <div class="replay-plate" id="replay-plate">
             <div id="replay-status">{{ replayState.replayStatus.text }}</div>

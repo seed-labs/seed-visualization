@@ -1,4 +1,4 @@
-﻿import {
+import {
   Cartesian3,
   Cartesian2,
   Cartographic,
@@ -27,8 +27,6 @@ import type {
   GroundStation,
   InterSatelliteLink,
   NetworkNodeLocation,
-  NetworkNodeRef,
-  NetworkPathUpdateState,
   PlannedOrbitRecord,
   SatelliteGroundLink,
   SatellitePoint,
@@ -39,12 +37,9 @@ Ion.defaultAccessToken = '';
 
 const HIGHLIGHT_COLOR = Color.fromCssColorString('#fff7c8');
 const HOVER_COLOR = Color.fromCssColorString('#fff8dc');
-const ORBIT_COLOR = Color.fromCssColorString('#ff6b3a').withAlpha(0.42);
 const STATION_COLOR = Color.fromCssColorString('#ffffff');
 const LINK_COLOR = Color.fromCssColorString('#45f3ff').withAlpha(0.62);
 const SATELLITE_LINK_COLOR = Color.fromCssColorString('#ffe66d').withAlpha(0.72);
-const NETWORK_FORWARD_LINK_COLOR = Color.fromCssColorString('#ff4dff').withAlpha(0.9);
-const NETWORK_RETURN_LINK_COLOR = Color.fromCssColorString('#39ff9f').withAlpha(0.82);
 const ROUTER_COLOR = Color.fromCssColorString('#b36bff');
 const HOST_COLOR = Color.fromCssColorString('#55ffbd');
 const TRAFFIC_FLASH_COLOR = Color.fromCssColorString('#fff176');
@@ -61,7 +56,7 @@ type LinkSnapshot = {
   positions: Cartesian3[];
   color: Color;
   width: number;
-  material: 'dash' | 'arrow';
+  material: 'dash';
 };
 
 type RetiringLinkSnapshot = LinkSnapshot & {
@@ -79,10 +74,6 @@ function createDashMaterial(color: Color) {
     dashLength: 18,
     dashPattern: 0b1111000011110000,
   });
-}
-
-function createArrowMaterial(color: Color) {
-  return Material.fromType(Material.PolylineArrowType, { color });
 }
 
 function createMeridianPositions(longitude: number) {
@@ -139,13 +130,13 @@ export type RenderOptions = {
   groundStations: GroundStation[];
   groundLinks: SatelliteGroundLink[];
   satelliteLinks: InterSatelliteLink[];
-  networkLinks: NetworkPathUpdateState[];
-  networkNodes: NetworkNodeLocation[];
   containerNodes: NetworkNodeLocation[];
   activeTrafficNodeIds: string[];
   focusedSatelliteId?: string;
   focusedStationId?: string;
   focusedContainerNodeId?: string;
+  frontSatelliteId?: string;
+  frontStationId?: string;
   showSatellites: boolean;
   showGroundStations: boolean;
   showLabels: boolean;
@@ -244,7 +235,6 @@ export function createCesiumScene(container: HTMLElement): CesiumSceneApi {
   const orbitLines = viewer.scene.primitives.add(new PolylineCollection());
   const groundLinkLines = viewer.scene.primitives.add(new PolylineCollection());
   const satelliteLinkLines = viewer.scene.primitives.add(new PolylineCollection());
-  const networkLinkLines = viewer.scene.primitives.add(new PolylineCollection());
   const gridLines = viewer.scene.primitives.add(new PolylineCollection());
   for (let longitude = -180; longitude <= 180; longitude += 15) {
     gridLines.add({
@@ -265,6 +255,8 @@ export function createCesiumScene(container: HTMLElement): CesiumSceneApi {
   let lastLinkSnapshots = new Map<string, LinkSnapshot>();
   const linkFlashUntilByKey = new Map<string, number>();
   const retiringLinksByKey = new Map<string, RetiringLinkSnapshot>();
+  let lastFrontSatelliteId: string | undefined;
+  let lastFrontStationId: string | undefined;
   let hoveredSatelliteId: string | undefined;
   let hoveredStationId: string | undefined;
   let hoveredContainerNodeId: string | undefined;
@@ -337,15 +329,11 @@ export function createCesiumScene(container: HTMLElement): CesiumSceneApi {
     orbitLines.removeAll();
     groundLinkLines.removeAll();
     satelliteLinkLines.removeAll();
-    networkLinkLines.removeAll();
     pointBySatelliteId.clear();
     pointByStationId.clear();
     const highlightedIds = new Set(options.highlightedIds);
     const satelliteById = new Map(satellites.map((satellite) => [satellite.id, satellite]));
     const stationById = new Map(options.groundStations.map((station) => [station.id, station]));
-    const networkNodeById = new Map(
-      [...options.networkNodes, ...options.containerNodes].map((node) => [node.id, node]),
-    );
     const activeTrafficNodeIds = new Set(options.activeTrafficNodeIds);
     const connectedSatelliteIds = new Set<string>();
     const connectedStationIds = new Set<string>();
@@ -357,41 +345,24 @@ export function createCesiumScene(container: HTMLElement): CesiumSceneApi {
       connectedSatelliteIds.add(link.satelliteAId);
       connectedSatelliteIds.add(link.satelliteBId);
     });
-    options.networkLinks.forEach((link) => {
-      [...link.forwardPath, ...link.returnPath].forEach((node) => {
-        if (isSatelliteNode(node)) {
-          connectedSatelliteIds.add(node.id);
-        }
-        if (isGroundStationNode(node)) {
-          connectedStationIds.add(node.id);
-        }
-      });
-    });
-
-    const connectedNetworkNodeIds = new Set<string>();
-    options.networkLinks.forEach((link) => {
-      [...link.forwardPath, ...link.returnPath].forEach((node) => {
-        if (!isSatelliteNode(node) && !isGroundStationNode(node)) {
-          connectedNetworkNodeIds.add(node.id);
-        }
-      });
-    });
-
-    options.networkNodes.forEach((node) => {
-      renderNetworkNodePoint(node, false, 'network-node');
-    });
+    turnRequestedTargetToFront(
+      options.frontSatelliteId,
+      options.frontStationId,
+      satelliteById,
+      stationById,
+    );
 
     options.containerNodes.forEach((node) => {
       renderNetworkNodePoint(node, isTrafficNodeActive(node.id, activeTrafficNodeIds), 'container-node');
     });
 
-    [...options.networkNodes, ...options.containerNodes].forEach((node) => {
+    options.containerNodes.forEach((node) => {
       const position = Cartesian3.fromDegrees(node.longitude, node.latitude, node.altitudeMeters ?? 0);
       const isHost = node.type === 'host';
       const color = isHost ? HOST_COLOR : ROUTER_COLOR;
       if (
         options.showLabels &&
-        (connectedNetworkNodeIds.has(node.id) || isTrafficNodeActive(node.id, activeTrafficNodeIds))
+        isTrafficNodeActive(node.id, activeTrafficNodeIds)
       ) {
         labels.add({
           position,
@@ -551,29 +522,6 @@ export function createCesiumScene(container: HTMLElement): CesiumSceneApi {
       });
     });
 
-    options.networkLinks.forEach((link) => {
-      renderNetworkPath(
-        link.id,
-        'forward',
-        link.forwardPath,
-        NETWORK_FORWARD_LINK_COLOR,
-        satelliteById,
-        stationById,
-        networkNodeById,
-        renderTrackedLink,
-      );
-      renderNetworkPath(
-        link.id,
-        'return',
-        link.returnPath,
-        NETWORK_RETURN_LINK_COLOR,
-        satelliteById,
-        stationById,
-        networkNodeById,
-        renderTrackedLink,
-      );
-    });
-
     lastLinkSnapshots.forEach((snapshot, key) => {
       if (!nextLinkSnapshots.has(key) && !retiringLinksByKey.has(key)) {
         retiringLinksByKey.set(key, {
@@ -622,12 +570,44 @@ export function createCesiumScene(container: HTMLElement): CesiumSceneApi {
     }
   }
 
-  function isSatelliteNode(node: NetworkNodeRef) {
-    return node.type === 'satellite';
+  function turnRequestedTargetToFront(
+    frontSatelliteId: string | undefined,
+    frontStationId: string | undefined,
+    satelliteById: Map<string, SatellitePoint>,
+    stationById: Map<string, GroundStation>,
+  ) {
+    if (!frontSatelliteId) {
+      lastFrontSatelliteId = undefined;
+    } else if (frontSatelliteId !== lastFrontSatelliteId) {
+      const satellite = satelliteById.get(frontSatelliteId);
+      if (satellite) {
+        turnLocationToFront(satellite.longitude, satellite.latitude);
+        lastFrontSatelliteId = frontSatelliteId;
+      }
+    }
+
+    if (!frontStationId) {
+      lastFrontStationId = undefined;
+    } else if (frontStationId !== lastFrontStationId) {
+      const station = stationById.get(frontStationId);
+      if (station) {
+        turnLocationToFront(station.longitude, station.latitude);
+        lastFrontStationId = frontStationId;
+      }
+    }
   }
 
-  function isGroundStationNode(node: NetworkNodeRef) {
-    return ['groundStation', 'ground-station', 'base-station', 'station'].includes(node.type);
+  function turnLocationToFront(longitude: number, latitude: number) {
+    const currentHeight = viewer.camera.positionCartographic.height;
+    viewer.camera.flyTo({
+      destination: Cartesian3.fromDegrees(longitude, latitude, currentHeight),
+      duration: 0.75,
+      orientation: {
+        heading: viewer.camera.heading,
+        pitch: CesiumMath.toRadians(-90),
+        roll: 0,
+      },
+    });
   }
 
   function renderNetworkNodePoint(
@@ -653,54 +633,6 @@ export function createCesiumScene(container: HTMLElement): CesiumSceneApi {
     });
   }
 
-  function resolveNetworkNodePosition(
-    node: NetworkNodeRef,
-    satelliteById: Map<string, SatellitePoint>,
-    stationById: Map<string, GroundStation>,
-    networkNodeById: Map<string, NetworkNodeLocation>,
-  ) {
-    if (isSatelliteNode(node)) {
-      const satellite = satelliteById.get(node.id);
-      return satellite
-        ? Cartesian3.fromDegrees(
-            satellite.longitude,
-            satellite.latitude,
-            satellite.altitudeKm * 1000,
-          )
-        : undefined;
-    }
-
-    if (isGroundStationNode(node)) {
-      const station = stationById.get(node.id);
-      return station
-        ? Cartesian3.fromDegrees(station.longitude, station.latitude, station.altitudeMeters)
-        : undefined;
-    }
-
-    const networkNode = networkNodeById.get(node.id);
-    if (networkNode) {
-      return Cartesian3.fromDegrees(
-        networkNode.longitude,
-        networkNode.latitude,
-        networkNode.altitudeMeters ?? 0,
-      );
-    }
-
-    return undefined;
-  }
-
-  function resolveContainerNode(
-    containerId: string,
-    networkNodeById: Map<string, NetworkNodeLocation>,
-  ) {
-    return (
-      networkNodeById.get(containerId) ??
-      Array.from(networkNodeById.values()).find((item) =>
-        item.id.startsWith(containerId) || containerId.startsWith(item.id),
-      )
-    );
-  }
-
   function isTrafficNodeActive(nodeId: string, activeTrafficNodeIds: Set<string>) {
     return (
       activeTrafficNodeIds.has(nodeId) ||
@@ -715,55 +647,11 @@ export function createCesiumScene(container: HTMLElement): CesiumSceneApi {
     return Boolean(node?.id && node.pickKind === 'container-node');
   }
 
-  function renderNetworkPath(
-    flowId: string | undefined,
-    direction: 'forward' | 'return',
-    path: NetworkNodeRef[],
-    color: Color,
-    satelliteById: Map<string, SatellitePoint>,
-    stationById: Map<string, GroundStation>,
-    networkNodeById: Map<string, NetworkNodeLocation>,
-    renderTrackedLink: (snapshot: LinkSnapshot) => void,
-  ) {
-    if (path.length < 2) {
-      return;
-    }
-
-    for (let index = 0; index < path.length - 1; index += 1) {
-      const source = resolveNetworkNodePosition(
-        path[index],
-        satelliteById,
-        stationById,
-        networkNodeById,
-      );
-      const target = resolveNetworkNodePosition(
-        path[index + 1],
-        satelliteById,
-        stationById,
-        networkNodeById,
-      );
-      if (!source || !target) {
-        continue;
-      }
-
-      renderTrackedLink({
-        key: createNetworkLinkKey(flowId, direction, index, path[index], path[index + 1]),
-        positions: [source, target],
-        width: 2.2,
-        color,
-        material: 'arrow',
-      });
-    }
-  }
-
   function drawLinkSnapshot(snapshot: LinkSnapshot) {
-    const collection = snapshot.material === 'arrow' ? networkLinkLines : groundLinkLines;
-    collection.add({
+    groundLinkLines.add({
       positions: snapshot.positions,
       width: snapshot.width,
-      material: snapshot.material === 'arrow'
-        ? createArrowMaterial(snapshot.color)
-        : createDashMaterial(snapshot.color),
+      material: createDashMaterial(snapshot.color),
     });
   }
 
@@ -774,17 +662,6 @@ export function createCesiumScene(container: HTMLElement): CesiumSceneApi {
   function createSatelliteLinkKey(link: InterSatelliteLink) {
     const [left, right] = [link.satelliteAId, link.satelliteBId].sort();
     return `satellite:${left}<->${right}`;
-  }
-
-  function createNetworkLinkKey(
-    flowId: string | undefined,
-    direction: 'forward' | 'return',
-    hopIndex: number,
-    source: NetworkNodeRef,
-    target: NetworkNodeRef,
-  ) {
-    const flowKey = flowId ?? 'flow';
-    return `network:${flowKey}:${direction}:${hopIndex}:${source.type}:${source.id}->${target.type}:${target.id}`;
   }
 
   viewer.screenSpaceEventHandler.setInputAction((movement: { position: Cartesian2 }) => {

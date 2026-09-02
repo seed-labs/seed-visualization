@@ -1,0 +1,52 @@
+name: CI Docker Lifecycle Probes
+
+on:
+  # pull_request:
+  #   branches:
+  #     - main
+  #   paths:
+  #     - "emulator-service/**"
+  #     - "internet-map/**"
+  #     - "internet-map-globe/**"
+  #     - "satellite-emulator/**"
+  #     - "satellite-emulator-service/**"
+  #     - "docker-compose.yml"
+  #     - "ci/**"
+  #     - ".github/workflows/ci-docker-lifecycle.yaml"
+  # push:
+  #   branches:
+  #     - main
+  #   paths:
+  #     - "emulator-service/**"
+  #     - "internet-map/**"
+  #     - "internet-map-globe/**"
+  #     - "satellite-emulator/**"
+  #     - "satellite-emulator-service/**"
+  #     - "docker-compose.yml"
+  #     - "ci/**"
+  #     - ".github/workflows/ci-docker-lifecycle.yaml"
+  workflow_call: {}
+  workflow_dispatch: {}
+
+jobs:
+  docker-lifecycle:
+    name: Docker Lifecycle Probes
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Build lifecycle images
+        run: docker compose build seedemu_emulator_service seedemu_satellite_emulator_service seedemu_internet_map seedemu_internet_map_globe seedemu_satellite_emulator
+
+      - name: Run compose lifecycle probes
+        run: bash ci/probe-docker-compose.sh
+
+      - name: Upload lifecycle artifacts
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: docker-lifecycle-artifacts
+          path: ci-artifacts/docker-lifecycle

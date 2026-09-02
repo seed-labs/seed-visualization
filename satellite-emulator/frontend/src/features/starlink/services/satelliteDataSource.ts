@@ -4,17 +4,13 @@ import type {
   InterSatelliteLink,
   LinksRequest,
   LinkUpdateState,
-  NetworkLinkFrame,
-  NetworkLinksRequest,
-  NetworkNodeRef,
-  NetworkPathUpdateState,
   SatelliteGroundLink,
   SatelliteGroundLinkFrame,
   SatelliteLinkFrame,
   SatelliteLinksRequest,
 } from '@/features/starlink/types';
 
-export type SatelliteDataEvent = 'ground-links' | 'satellite-links' | 'network-links' | 'dead';
+export type SatelliteDataEvent = 'ground-links' | 'satellite-links' | 'dead';
 
 type LinkUpdatesMessage = {
   type: 'SATELLITE_LINK_UPDATES';
@@ -22,8 +18,7 @@ type LinkUpdatesMessage = {
 };
 
 type LinkUpdatePlaybackFrame = {
-  update: LinkUpdateState | NetworkPathUpdateState;
-  requestType: 'satellite' | 'network';
+  update: LinkUpdateState;
   startTimeMs: number;
   endTimeMs: number;
   requestIndex: number;
@@ -74,31 +69,6 @@ function isLinkUpdateState(value: unknown): value is LinkUpdateState {
   );
 }
 
-function isNetworkNodeRef(value: unknown): value is NetworkNodeRef {
-  const node = value as NetworkNodeRef;
-
-  return Boolean(
-    node &&
-      typeof node.id === 'string' &&
-      typeof node.type === 'string' &&
-      (node.latencyMs === undefined || typeof node.latencyMs === 'number') &&
-      (node.packetLoss === undefined || typeof node.packetLoss === 'number'),
-  );
-}
-
-function isNetworkPathUpdateState(value: unknown): value is NetworkPathUpdateState {
-  const update = value as NetworkPathUpdateState;
-
-  return Boolean(
-    update &&
-      (update.id === undefined || typeof update.id === 'string') &&
-      Array.isArray(update.forwardPath) &&
-      update.forwardPath.every(isNetworkNodeRef) &&
-      Array.isArray(update.returnPath) &&
-      update.returnPath.every(isNetworkNodeRef),
-  );
-}
-
 function hasValidTimelineFields(value: unknown): value is { interval: string; timestamp: string } {
   const request = value as { interval: string; timestamp: string };
 
@@ -120,19 +90,8 @@ function isSatelliteLinksRequest(value: unknown): value is SatelliteLinksRequest
   );
 }
 
-function isNetworkLinksRequest(value: unknown): value is NetworkLinksRequest {
-  const request = value as NetworkLinksRequest;
-
-  return Boolean(
-    hasValidTimelineFields(request) &&
-      request.type === 'network' &&
-      Array.isArray(request.links) &&
-      request.links.every(isNetworkPathUpdateState),
-  );
-}
-
 function isLinksRequest(value: unknown): value is LinksRequest {
-  return isSatelliteLinksRequest(value) || isNetworkLinksRequest(value);
+  return isSatelliteLinksRequest(value);
 }
 
 function isLinkUpdatesMessage(value: unknown): value is LinkUpdatesMessage {
@@ -191,7 +150,6 @@ export class SatelliteDataSource {
   private _timelineCompleted = true;
   private _groundLinksEventHandler: (data: SatelliteGroundLinkFrame) => void = () => undefined;
   private _satelliteLinksEventHandler: (data: SatelliteLinkFrame) => void = () => undefined;
-  private _networkLinksEventHandler: (data: NetworkLinkFrame) => void = () => undefined;
   private _errorHandler: (error: Event | CloseEvent | unknown) => void = () => undefined;
 
   constructor(
@@ -243,7 +201,6 @@ export class SatelliteDataSource {
 
   on(eventName: 'ground-links', callback: (data: SatelliteGroundLinkFrame) => void): void;
   on(eventName: 'satellite-links', callback: (data: SatelliteLinkFrame) => void): void;
-  on(eventName: 'network-links', callback: (data: NetworkLinkFrame) => void): void;
   on(eventName: 'dead', callback: (data: unknown) => void): void;
   on(eventName: SatelliteDataEvent, callback: (data: any) => void = () => undefined) {
     switch (eventName) {
@@ -252,9 +209,6 @@ export class SatelliteDataSource {
         break;
       case 'satellite-links':
         this._satelliteLinksEventHandler = callback as (data: SatelliteLinkFrame) => void;
-        break;
-      case 'network-links':
-        this._networkLinksEventHandler = callback as (data: NetworkLinkFrame) => void;
         break;
       case 'dead':
         this._errorHandler = callback;
@@ -325,7 +279,6 @@ export class SatelliteDataSource {
         const startTimeMs = requestStartTimeMs + groupIndex * intervalMs;
         playbackFrames.push({
           update,
-          requestType: request.type === 'network' ? 'network' : 'satellite',
           startTimeMs,
           endTimeMs: startTimeMs + intervalMs,
           requestIndex,
@@ -352,29 +305,7 @@ export class SatelliteDataSource {
 
   private emitFrame(frame: LinkUpdatePlaybackFrame) {
     const sampleTime = new Date(frame.startTimeMs);
-    if (frame.requestType === 'network') {
-      this._groundLinksEventHandler({
-        links: [],
-        sampleTime,
-        requestIndex: frame.requestIndex,
-        groupIndex: frame.groupIndex,
-      });
-      this._satelliteLinksEventHandler({
-        links: [],
-        sampleTime,
-        requestIndex: frame.requestIndex,
-        groupIndex: frame.groupIndex,
-      });
-      this._networkLinksEventHandler({
-        links: [frame.update as NetworkPathUpdateState],
-        sampleTime,
-        requestIndex: frame.requestIndex,
-        groupIndex: frame.groupIndex,
-      });
-      return;
-    }
-
-    const update = frame.update as LinkUpdateState;
+    const update = frame.update;
     this._groundLinksEventHandler({
       links: toSatelliteGroundLinks(update.groundLinks),
       sampleTime,
@@ -383,12 +314,6 @@ export class SatelliteDataSource {
     });
     this._satelliteLinksEventHandler({
       links: update.satelliteLinks,
-      sampleTime,
-      requestIndex: frame.requestIndex,
-      groupIndex: frame.groupIndex,
-    });
-    this._networkLinksEventHandler({
-      links: [],
       sampleTime,
       requestIndex: frame.requestIndex,
       groupIndex: frame.groupIndex,
@@ -408,13 +333,6 @@ export class SatelliteDataSource {
       completed,
     });
     this._satelliteLinksEventHandler({
-      links: [],
-      sampleTime,
-      requestIndex: -1,
-      groupIndex: -1,
-      completed,
-    });
-    this._networkLinksEventHandler({
       links: [],
       sampleTime,
       requestIndex: -1,

@@ -12,6 +12,8 @@
 #define FILTER_DIRECTION_INGRESS 1
 #define FILTER_DIRECTION_EGRESS 2
 
+#define PACKET_CAPTURE_MAX 65535
+
 struct filter_config {
     __u8 enabled;
     __u8 ip_proto;
@@ -33,16 +35,22 @@ struct packet_event {
     __u32 packet_len;
     __u8 direction;
     __u8 ip_proto;
-    __u16 eth_proto;
+    __u8 icmp_type;
+    __u8 icmp_code;
     __u32 src_ip;
     __u32 dst_ip;
     __u16 src_port;
     __u16 dst_port;
+    __u16 icmp_id;
+    __u16 icmp_seq;
+    __u32 tcp_seq;
+    __u32 tcp_ack;
+    __u8 tcp_flags;
+    __u8 reserved[3];
     __u8 src_mac[6];
     __u8 dst_mac[6];
-    __u8 tcp_flags;
-    __u8 ttl;
-    __u16 ip_total_len;
+    __u32 captured_len;
+    __u8 packet_data[PACKET_CAPTURE_MAX];
 };
 
 #endif

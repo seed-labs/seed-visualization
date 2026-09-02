@@ -20,28 +20,46 @@ type Server struct {
 	httpServer *http.Server
 }
 
-type Route struct {
-	Pattern string
-	Handler http.Handler
+type ServerOptions struct {
+	Context             context.Context
+	Addr                string
+	FilterMap           *ebpf.Map
+	InitialFilter       string
+	BeforeFilterApplied func(newExpr string) error
+	OnFilterApplied     func(oldExpr string, newExpr string) error
+	PacketStreamHandler http.Handler
+	PcapHandler         http.Handler
+	InterfacesHandler   http.Handler
 }
 
-func NewServer(ctx context.Context, addr string, filterMap *ebpf.Map, initialFilter string, routes ...Route) *Server {
-	filterControl := newFilterControl(filterMap, initialFilter)
+const (
+	FilterPath       = "/filter"
+	HealthPath       = "/healthz"
+	PacketStreamPath = "/ws/packets"
+	PcapPath         = "/pcap"
+	InterfacesPath   = "/interfaces"
+)
+
+func NewServer(options ServerOptions) *Server {
+	filterControl := newFilterControl(options.FilterMap, options.InitialFilter, options.BeforeFilterApplied, options.OnFilterApplied)
 
 	mux := http.NewServeMux()
-	mux.Handle("/filter", filterControl)
-	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
+	mux.Handle(FilterPath, filterControl)
+	mux.HandleFunc(HealthPath, func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 	})
-	for _, route := range routes {
-		if route.Pattern == "" || route.Handler == nil {
-			continue
-		}
-		mux.Handle(route.Pattern, route.Handler)
+	if options.PacketStreamHandler != nil {
+		mux.Handle(PacketStreamPath, options.PacketStreamHandler)
+	}
+	if options.PcapHandler != nil {
+		mux.Handle(PcapPath, options.PcapHandler)
+	}
+	if options.InterfacesHandler != nil {
+		mux.Handle(InterfacesPath, options.InterfacesHandler)
 	}
 
 	httpServer := &http.Server{
-		Addr:              addr,
+		Addr:              options.Addr,
 		Handler:           withCORS(mux),
 		ReadHeaderTimeout: 2 * time.Second,
 	}
@@ -49,7 +67,7 @@ func NewServer(ctx context.Context, addr string, filterMap *ebpf.Map, initialFil
 	server := &Server{httpServer: httpServer}
 
 	go func() {
-		<-ctx.Done()
+		<-options.Context.Done()
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()
 		_ = server.Shutdown(shutdownCtx)
@@ -84,9 +102,11 @@ func (s *Server) Shutdown(ctx context.Context) error {
 }
 
 type filterControl struct {
-	mu     sync.RWMutex
-	expr   string
-	bpfMap *ebpf.Map
+	mu                  sync.RWMutex
+	expr                string
+	bpfMap              *ebpf.Map
+	beforeFilterApplied func(newExpr string) error
+	onFilterApplied     func(oldExpr string, newExpr string) error
 }
 
 type filterRequest struct {
@@ -97,10 +117,17 @@ type filterResponse struct {
 	Filter string `json:"filter"`
 }
 
-func newFilterControl(bpfMap *ebpf.Map, initialExpr string) *filterControl {
+func newFilterControl(
+	bpfMap *ebpf.Map,
+	initialExpr string,
+	beforeFilterApplied func(newExpr string) error,
+	onFilterApplied func(oldExpr string, newExpr string) error,
+) *filterControl {
 	return &filterControl{
-		expr:   initialExpr,
-		bpfMap: bpfMap,
+		expr:                initialExpr,
+		bpfMap:              bpfMap,
+		beforeFilterApplied: beforeFilterApplied,
+		onFilterApplied:     onFilterApplied,
 	}
 }
 
@@ -127,11 +154,25 @@ func (c *filterControl) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		if expr != "" && c.beforeFilterApplied != nil {
+			if err := c.beforeFilterApplied(expr); err != nil {
+				http.Error(w, err.Error(), http.StatusServiceUnavailable)
+				return
+			}
+		}
+
 		c.mu.Lock()
 		defer c.mu.Unlock()
+		oldExpr := c.expr
 		if err := UpdateFilter(c.bpfMap, cfg); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
+		}
+		if c.onFilterApplied != nil {
+			if err := c.onFilterApplied(oldExpr, expr); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
 		}
 		c.expr = expr
 		log.Printf("traffic filter updated: %q", expr)

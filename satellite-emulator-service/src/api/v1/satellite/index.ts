@@ -8,11 +8,11 @@ const router = express.Router();
 const linksJsonParser = express.json({
     limit: '10kb',
 });
-const projectDirectory = path.resolve(__dirname, '../../../../..');
+const projectDirectory = path.resolve(__dirname, '../../../..');
 const linksDirectory = path.join(projectDirectory, 'tmp');
 const defaultLinksPath = path.join(linksDirectory, 'links.json');
-const defaultNetworkLinksPath = path.join(linksDirectory, 'network_links.json');
-const networkNodesPath = path.join(linksDirectory, 'network_nodes.json');
+const plannedShellOrbitPath = path.join(linksDirectory, 'planned_shell_orbit.json');
+const starlinkGatewaysPath = path.join(linksDirectory, 'starlink_gateways.json');
 
 interface GroundLink {
     groundStationId: string;
@@ -29,19 +29,6 @@ interface SatelliteLinkUpdate {
     satelliteLinks: SatelliteLink[];
 }
 
-interface NetworkNodeRef {
-    id: string;
-    type: string;
-    latencyMs?: number;
-    packetLoss?: number;
-}
-
-interface NetworkPathUpdate {
-    id?: string;
-    forwardPath: NetworkNodeRef[];
-    returnPath: NetworkNodeRef[];
-}
-
 interface SatelliteLinksRequest {
     interval: string;
     links: SatelliteLinkUpdate[];
@@ -49,14 +36,7 @@ interface SatelliteLinksRequest {
     type?: 'satellite';
 }
 
-interface NetworkLinksRequest {
-    interval: string;
-    links: NetworkPathUpdate[];
-    timestamp: string;
-    type: 'network';
-}
-
-type LinksRequest = SatelliteLinksRequest | NetworkLinksRequest;
+type LinksRequest = SatelliteLinksRequest;
 
 function isGroundLink(value: unknown): value is GroundLink {
     const link = value as GroundLink;
@@ -90,31 +70,6 @@ function isSatelliteLinkUpdate(value: unknown): value is SatelliteLinkUpdate {
     );
 }
 
-function isNetworkNodeRef(value: unknown): value is NetworkNodeRef {
-    const node = value as NetworkNodeRef;
-
-    return Boolean(
-        node &&
-        typeof node.id === 'string' &&
-        typeof node.type === 'string' &&
-        (node.latencyMs === undefined || typeof node.latencyMs === 'number') &&
-        (node.packetLoss === undefined || typeof node.packetLoss === 'number')
-    );
-}
-
-function isNetworkPathUpdate(value: unknown): value is NetworkPathUpdate {
-    const update = value as NetworkPathUpdate;
-
-    return Boolean(
-        update &&
-        (update.id === undefined || typeof update.id === 'string') &&
-        Array.isArray(update.forwardPath) &&
-        update.forwardPath.every(isNetworkNodeRef) &&
-        Array.isArray(update.returnPath) &&
-        update.returnPath.every(isNetworkNodeRef)
-    );
-}
-
 function hasValidTimelineFields(value: unknown): value is {interval: string; timestamp: string} {
     const body = value as {interval: string; timestamp: string};
 
@@ -136,19 +91,8 @@ function isSatelliteLinksRequest(value: unknown): value is SatelliteLinksRequest
     );
 }
 
-function isNetworkLinksRequest(value: unknown): value is NetworkLinksRequest {
-    const body = value as NetworkLinksRequest;
-
-    return Boolean(
-        hasValidTimelineFields(body) &&
-        body.type === 'network' &&
-        Array.isArray(body.links) &&
-        body.links.every(isNetworkPathUpdate)
-    );
-}
-
 function isLinksRequest(value: unknown): value is LinksRequest {
-    return isSatelliteLinksRequest(value) || isNetworkLinksRequest(value);
+    return isSatelliteLinksRequest(value);
 }
 
 function broadcastLinks(result: LinksRequest | LinksRequest[]) {
@@ -181,10 +125,6 @@ function getDefaultLinksPath(requestedType: unknown): string | undefined {
         return defaultLinksPath;
     }
 
-    if (requestedType === 'network') {
-        return defaultNetworkLinksPath;
-    }
-
     return undefined;
 }
 
@@ -206,36 +146,44 @@ function resolveLinksPath(requestedPath: unknown, requestedType: unknown): strin
     return resolvedPath;
 }
 
-router.get('/network-nodes', async function (_req, res) {
-    let source: string;
+async function readJsonPayload(filePath: string): Promise<unknown> {
+    const source = await fs.readFile(filePath, 'utf8');
+    return JSON.parse(source);
+}
+
+async function sendJsonFile(res: express.Response, filePath: string, label: string) {
     try {
-        source = await fs.readFile(networkNodesPath, 'utf8');
+        res.json({
+            ok: true,
+            result: await readJsonPayload(filePath),
+        });
     } catch (error) {
         if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
             res.status(404).json({
                 ok: false,
-                result: `network nodes file not found: ${networkNodesPath}`
+                result: `${label} file not found: ${filePath}`,
             });
             return;
         }
+
+        if (error instanceof SyntaxError) {
+            res.status(500).json({
+                ok: false,
+                result: `${label} file is not valid JSON: ${filePath}`,
+            });
+            return;
+        }
+
         throw error;
     }
+}
 
-    let result: unknown;
-    try {
-        result = JSON.parse(source);
-    } catch {
-        res.status(400).json({
-            ok: false,
-            result: `network nodes file is not valid JSON: ${networkNodesPath}`
-        });
-        return;
-    }
+router.get('/planned-shell-orbit', async function (_req, res) {
+    await sendJsonFile(res, plannedShellOrbitPath, 'planned shell orbit');
+});
 
-    res.json({
-        ok: true,
-        result,
-    });
+router.get('/starlink-gateways', async function (_req, res) {
+    await sendJsonFile(res, starlinkGatewaysPath, 'starlink gateways');
 });
 
 router.post('/links', linksJsonParser, async function (req, res) {
@@ -256,7 +204,7 @@ router.post('/links', linksJsonParser, async function (req, res) {
     if (!linksPath) {
         res.status(400).json({
             ok: false,
-            result: 'path must reference a JSON file inside the satellite-emulator/tmp directory; type must be satellite or network when path is omitted.'
+            result: 'path must reference a JSON file inside the satellite-emulator-service/tmp directory; type must be satellite or omitted when path is omitted.'
         });
         return;
     }
@@ -289,7 +237,7 @@ router.post('/links', linksJsonParser, async function (req, res) {
     if (!isLinksRequest(body) && (!Array.isArray(body) || !body.every(isLinksRequest))) {
         res.status(400).json({
             ok: false,
-            result: 'links file must contain a satellite/network LinksRequest or LinksRequest array.'
+            result: 'links file must contain a satellite LinksRequest or LinksRequest array.'
         });
         return;
     }

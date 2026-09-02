@@ -12,7 +12,12 @@ export type EmulatorContainerInfo = {
     emulatorInfo?: {
       name?: string;
       role?: string;
+      asn?: number;
       displayname?: string;
+      nets?: Array<{
+        name?: string;
+        address?: string;
+      }>;
       longitude?: string;
       latitude?: string;
     };

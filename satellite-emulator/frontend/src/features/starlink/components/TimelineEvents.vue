@@ -125,7 +125,7 @@ import type {
   TimelineDisplayEvent,
   TimelineEvent,
   TimelineTick,
-} from '@/features/starlink/types/timeline';
+} from '@/features/starlink/types';
 
 defineProps<{
   collapsed: boolean;

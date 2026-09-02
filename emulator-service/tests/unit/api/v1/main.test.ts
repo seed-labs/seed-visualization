@@ -11,7 +11,11 @@ const dockerMock = {
 const hasSession = jest.fn().mockReturnValue(false);
 const isNetworkConnected = jest.fn();
 const setNetworkConnected = jest.fn();
+const listBgpPeers = jest.fn();
+const setBgpPeerState = jest.fn();
 const sniff = jest.fn();
+const setListener = jest.fn();
+const setCapturePacketListener = jest.fn();
 const submitEvent = jest.fn();
 
 jest.mock('../../../../src/utils/socket-handler', () => ({
@@ -25,15 +29,15 @@ jest.mock('../../../../src/utils/controller', () => ({
   Controller: jest.fn().mockImplementation(() => ({
     isNetworkConnected,
     setNetworkConnected,
-    listBgpPeers: jest.fn(),
-    setBgpPeerState: jest.fn(),
+    listBgpPeers,
+    setBgpPeerState,
     getLoggers: () => [{ setSettings: jest.fn() }],
   })),
 }));
 jest.mock('../../../../src/utils/sniffer', () => ({
   Sniffer: jest.fn().mockImplementation(() => ({
-    setListener: jest.fn(),
-    setCapturePacketListener: jest.fn(),
+    setListener,
+    setCapturePacketListener,
     sniff,
     getLoggers: () => [{ setSettings: jest.fn() }],
   })),
@@ -150,6 +154,79 @@ describe('api v1 router', () => {
     expect(setNetworkConnected).toHaveBeenCalledWith(containerFixture.Id, false);
   });
 
+  it('returns details for a uniquely matched container id prefix', async () => {
+    hasSession.mockReturnValue(true);
+    dockerMock.listContainers.mockResolvedValue([containerFixture]);
+
+    const response = await request(app).get('/api/v1/container/node-123').expect(200);
+
+    expect(response.body.ok).toBe(true);
+    expect(response.body.result.Id).toBe(containerFixture.Id);
+    expect(response.body.result.meta.hasSession).toBe(true);
+    expect(response.body.result.meta.emulatorInfo.name).toBe('router-a');
+  });
+
+  it('rejects container operations when an id prefix is ambiguous', async () => {
+    dockerMock.listContainers.mockResolvedValue([
+      containerFixture,
+      { ...containerFixture, Id: 'node-1239999999', Names: ['/router-b'] },
+    ]);
+
+    const response = await request(app).get('/api/v1/container/node-123/net').expect(200);
+
+    expect(response.body.ok).toBe(false);
+    expect(response.body.result).toContain('no match or multiple match');
+    expect(isNetworkConnected).not.toHaveBeenCalled();
+  });
+
+  it('lists BGP peers for a uniquely matched container', async () => {
+    dockerMock.listContainers.mockResolvedValue([containerFixture]);
+    listBgpPeers.mockResolvedValue([{ peer: '10.0.0.1', state: 'Established' }]);
+
+    const response = await request(app).get('/api/v1/container/node-123/bgp').expect(200);
+
+    expect(response.body).toEqual({
+      ok: true,
+      result: [{ peer: '10.0.0.1', state: 'Established' }],
+    });
+    expect(listBgpPeers).toHaveBeenCalledWith(containerFixture.Id);
+  });
+
+  it('passes requested BGP peer state changes to the controller', async () => {
+    dockerMock.listContainers.mockResolvedValue([containerFixture]);
+
+    const response = await request(app)
+      .post('/api/v1/container/node-123/bgp/10.0.0.1')
+      .send({ status: false })
+      .expect(200);
+
+    expect(response.body).toEqual({ ok: true });
+    expect(setBgpPeerState).toHaveBeenCalledWith(containerFixture.Id, '10.0.0.1', false);
+  });
+
+  it('stores and returns the active sniff filter', async () => {
+    dockerMock.listContainers.mockResolvedValue([containerFixture]);
+    sniff.mockResolvedValue(undefined);
+
+    const setResponse = await request(app)
+      .post('/api/v1/sniff')
+      .send({ filter: 'icmp' })
+      .expect(200);
+
+    expect(setResponse.body).toEqual({
+      ok: true,
+      result: { currentFilter: 'icmp' },
+    });
+    expect(setListener).toHaveBeenCalled();
+    expect(sniff).toHaveBeenCalledWith([containerFixture.Id], 'icmp');
+
+    const getResponse = await request(app).get('/api/v1/sniff').expect(200);
+    expect(getResponse.body).toEqual({
+      ok: true,
+      result: { currentFilter: 'icmp' },
+    });
+  });
+
   it('returns parameter error for packet capture without node id or name', async () => {
     dockerMock.listContainers.mockResolvedValue([containerFixture]);
 
@@ -158,5 +235,22 @@ describe('api v1 router', () => {
     expect(response.body.ok).toBe(false);
     expect(response.body.result).toContain('does not exist');
     expect(sniff).not.toHaveBeenCalled();
+  });
+
+  it('starts packet capture by node name and returns the packet filter', async () => {
+    dockerMock.listContainers.mockResolvedValue([containerFixture]);
+    sniff.mockResolvedValue(undefined);
+
+    const response = await request(app)
+      .post('/api/v1/packet')
+      .send({ nodeName: '/router-a', filter: 'tcp port 80' })
+      .expect(200);
+
+    expect(response.body).toEqual({
+      ok: true,
+      result: { currentPacketFilter: 'tcp port 80' },
+    });
+    expect(setCapturePacketListener).toHaveBeenCalled();
+    expect(sniff).toHaveBeenCalledWith([containerFixture.Id], 'tcp port 80');
   });
 });

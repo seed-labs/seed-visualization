@@ -9,7 +9,6 @@ import {
 } from '@/features/starlink/constants/timeline';
 import type {
   InterSatelliteLink,
-  NetworkPathUpdateState,
   SatelliteGroundLink,
 } from '@/features/starlink/types';
 import type {
@@ -17,7 +16,7 @@ import type {
   TimelineEvent,
   TimelineEventKind,
   TimelineTick,
-} from '@/features/starlink/types/timeline';
+} from '@/features/starlink/types';
 
 export function useTimelineController(
   renderTime: Ref<Date>,
@@ -274,18 +273,6 @@ export function createGroundTimelineSignature(links: SatelliteGroundLink[]) {
 export function createSatelliteTimelineSignature(links: InterSatelliteLink[]) {
   return links
     .map((link) => [link.satelliteAId, link.satelliteBId].sort().join('<->'))
-    .sort()
-    .join('|');
-}
-
-export function createNetworkTimelineSignature(links: NetworkPathUpdateState[]) {
-  return links
-    .map((link, index) => {
-      const flowId = link.id ?? `flow-${index}`;
-      const forward = link.forwardPath.map((node) => `${node.type}:${node.id}`).join('>');
-      const backward = link.returnPath.map((node) => `${node.type}:${node.id}`).join('>');
-      return `${flowId}:f=${forward}:r=${backward}`;
-    })
     .sort()
     .join('|');
 }

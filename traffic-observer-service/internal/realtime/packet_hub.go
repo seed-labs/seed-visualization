@@ -12,37 +12,58 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-const PacketWebSocketPath = "/ws/packets"
-
 type PacketMessage struct {
-	Type              string    `json:"type"`
-	Timestamp         time.Time `json:"timestamp"`
-	TimestampNS       uint64    `json:"timestampNs"`
-	ContainerID       string    `json:"containerId"`
-	NodeName          string    `json:"nodeName,omitempty"`
-	NodeIP            string    `json:"nodeIp,omitempty"`
-	SourceIP          string    `json:"sourceIp,omitempty"`
-	DestIP            string    `json:"destIp,omitempty"`
-	IPProtocol        string    `json:"ipProtocol,omitempty"`
-	SourcePort        uint16    `json:"sourcePort,omitempty"`
-	DestPort          uint16    `json:"destPort,omitempty"`
-	SourceContainerID string    `json:"sourceContainerId,omitempty"`
-	SourceNodeName    string    `json:"sourceNodeName,omitempty"`
-	SourceNodeIP      string    `json:"sourceNodeIp,omitempty"`
-	DestContainerID   string    `json:"destContainerId,omitempty"`
-	DestNodeName      string    `json:"destNodeName,omitempty"`
-	DestNodeIP        string    `json:"destNodeIp,omitempty"`
+	Type                string    `json:"type"`
+	Timestamp           time.Time `json:"timestamp"`
+	TimestampNS         uint64    `json:"timestampNs"`
+	ContainerName       string    `json:"containerName"`
+	IfName              string    `json:"ifName,omitempty"`
+	NodeLabel           string    `json:"nodeLabel,omitempty"`
+	NodeName            string    `json:"nodeName,omitempty"`
+	NodeIP              string    `json:"nodeIp,omitempty"`
+	NetworkID           string    `json:"networkId,omitempty"`
+	NetworkName         string    `json:"networkName,omitempty"`
+	NetworkLabel        string    `json:"networkLabel,omitempty"`
+	SourceIP            string    `json:"sourceIp,omitempty"`
+	DestIP              string    `json:"destIp,omitempty"`
+	IPProtocol          string    `json:"ipProtocol,omitempty"`
+	FlowID              string    `json:"flowId,omitempty"`
+	PacketID            string    `json:"packetId,omitempty"`
+	PacketRole          string    `json:"packetRole,omitempty"`
+	PacketKind          string    `json:"packetKind,omitempty"`
+	SourcePort          uint16    `json:"sourcePort,omitempty"`
+	DestPort            uint16    `json:"destPort,omitempty"`
+	ICMPType            *uint8    `json:"icmpType,omitempty"`
+	ICMPCode            *uint8    `json:"icmpCode,omitempty"`
+	ICMPID              uint16    `json:"icmpId,omitempty"`
+	ICMPSeq             uint16    `json:"icmpSeq,omitempty"`
+	TCPSeq              uint32    `json:"tcpSeq,omitempty"`
+	TCPAck              uint32    `json:"tcpAck,omitempty"`
+	TCPFlags            string    `json:"tcpFlags,omitempty"`
+	SourceContainerName string    `json:"sourceContainerName,omitempty"`
+	SourceNodeName      string    `json:"sourceNodeName,omitempty"`
+	SourceNodeIP        string    `json:"sourceNodeIp,omitempty"`
+	DestContainerName   string    `json:"destContainerName,omitempty"`
+	DestNodeName        string    `json:"destNodeName,omitempty"`
+	DestNodeIP          string    `json:"destNodeIp,omitempty"`
 }
 
 type PacketHub struct {
 	mu       sync.RWMutex
 	clients  map[*packetClient]struct{}
 	upgrader websocket.Upgrader
+	name     string
 }
 
-func NewPacketHub() *PacketHub {
+func NewPacketHub(paths ...string) *PacketHub {
+	name := "ws-server"
+	if len(paths) > 0 && paths[0] != "" {
+		name += ":" + paths[0]
+	}
+
 	return &PacketHub{
 		clients: map[*packetClient]struct{}{},
+		name:    name,
 		upgrader: websocket.Upgrader{
 			ReadBufferSize:  1024,
 			WriteBufferSize: 1024,
@@ -54,7 +75,7 @@ func NewPacketHub() *PacketHub {
 }
 
 func (h *PacketHub) Name() string {
-	return "ws-server:" + PacketWebSocketPath
+	return h.name
 }
 
 func (h *PacketHub) Close() error {
@@ -75,27 +96,47 @@ func (h *PacketHub) Send(_ context.Context, value any) error {
 		return nil
 	}
 
-	h.Broadcast(PacketMessage{
-		Type:              "packet",
-		Timestamp:         packet.Timestamp,
-		TimestampNS:       packet.TimestampNS,
-		ContainerID:       packet.ContainerID,
-		NodeName:          packet.NodeName,
-		NodeIP:            packet.NodeIP,
-		SourceIP:          packet.SourceIP,
-		DestIP:            packet.DestIP,
-		IPProtocol:        packet.IPProtocol,
-		SourcePort:        packet.SourcePort,
-		DestPort:          packet.DestPort,
-		SourceContainerID: packet.SourceContainerID,
-		SourceNodeName:    packet.SourceNodeName,
-		SourceNodeIP:      packet.SourceNodeIP,
-		DestContainerID:   packet.DestContainerID,
-		DestNodeName:      packet.DestNodeName,
-		DestNodeIP:        packet.DestNodeIP,
-	})
+	h.Broadcast(NewPacketMessage(packet))
 
 	return nil
+}
+
+func NewPacketMessage(packet event.Packet) PacketMessage {
+	return PacketMessage{
+		Type:                "packet",
+		Timestamp:           packet.Timestamp,
+		TimestampNS:         packet.TimestampNS,
+		ContainerName:       packet.ContainerName,
+		IfName:              packet.IfName,
+		NodeLabel:           packet.NodeLabel,
+		NodeName:            packet.NodeName,
+		NodeIP:              packet.NodeIP,
+		NetworkID:           packet.NetworkID,
+		NetworkName:         packet.NetworkName,
+		NetworkLabel:        packet.NetworkLabel,
+		SourceIP:            packet.SourceIP,
+		DestIP:              packet.DestIP,
+		IPProtocol:          packet.IPProtocol,
+		FlowID:              packet.FlowID,
+		PacketID:            packet.PacketID,
+		PacketRole:          packet.PacketRole,
+		PacketKind:          packet.PacketKind,
+		SourcePort:          packet.SourcePort,
+		DestPort:            packet.DestPort,
+		ICMPType:            packet.ICMPType,
+		ICMPCode:            packet.ICMPCode,
+		ICMPID:              packet.ICMPID,
+		ICMPSeq:             packet.ICMPSeq,
+		TCPSeq:              packet.TCPSeq,
+		TCPAck:              packet.TCPAck,
+		TCPFlags:            packet.TCPFlags,
+		SourceContainerName: packet.SourceContainerName,
+		SourceNodeName:      packet.SourceNodeName,
+		SourceNodeIP:        packet.SourceNodeIP,
+		DestContainerName:   packet.DestContainerName,
+		DestNodeName:        packet.DestNodeName,
+		DestNodeIP:          packet.DestNodeIP,
+	}
 }
 
 func (h *PacketHub) Broadcast(message PacketMessage) {

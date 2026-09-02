@@ -8,11 +8,6 @@ const RECONNECT_DELAY_MS = 1800;
 type TrafficPacketHandler = (message: TrafficPacketMessage) => void;
 type TrafficErrorHandler = (error: Event) => void;
 
-export type TrafficObserverClient = {
-  connect: () => void;
-  disconnect: () => void;
-};
-
 function createDefaultTrafficObserverUrl() {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   return `${protocol}//${window.location.hostname}:${DEFAULT_TRAFFIC_OBSERVER_PORT}${TRAFFIC_PACKET_WS_PATH}`;
@@ -102,8 +97,8 @@ function isTrafficPacketMessage(value: unknown): value is TrafficPacketMessage {
         typeof message.timestampNs === 'number' ||
         typeof message.timestampNs === 'string'
       ) &&
-      typeof message.containerId === 'string' &&
-      message.containerId &&
+      typeof message.containerName === 'string' &&
+      message.containerName &&
       (
         message.direction === undefined ||
         message.direction === 'ingress' ||
@@ -116,82 +111,81 @@ function isTrafficPacketMessage(value: unknown): value is TrafficPacketMessage {
       (message.ipProtocol === undefined || typeof message.ipProtocol === 'string') &&
       (message.sourcePort === undefined || typeof message.sourcePort === 'number') &&
       (message.destPort === undefined || typeof message.destPort === 'number') &&
+      (message.sourceContainerName === undefined || typeof message.sourceContainerName === 'string') &&
       (message.sourceContainerId === undefined || typeof message.sourceContainerId === 'string') &&
       (message.sourceNodeName === undefined || typeof message.sourceNodeName === 'string') &&
       (message.sourceNodeIp === undefined || typeof message.sourceNodeIp === 'string') &&
+      (message.destContainerName === undefined || typeof message.destContainerName === 'string') &&
       (message.destContainerId === undefined || typeof message.destContainerId === 'string') &&
       (message.destNodeName === undefined || typeof message.destNodeName === 'string') &&
       (message.destNodeIp === undefined || typeof message.destNodeIp === 'string'),
   );
 }
 
-export function createTrafficObserverClient(
-  onPacket: TrafficPacketHandler,
-  onError?: TrafficErrorHandler,
-): TrafficObserverClient {
-  let socket: WebSocket | undefined;
-  let reconnectTimer: number | undefined;
-  let closedByUser = false;
+export class TrafficObserverClient {
+  private socket?: WebSocket;
+  private reconnectTimer?: number;
+  private closedByUser = false;
 
-  function clearReconnectTimer() {
-    if (reconnectTimer !== undefined) {
-      window.clearTimeout(reconnectTimer);
-      reconnectTimer = undefined;
-    }
-  }
+  constructor(
+    private readonly onPacket: TrafficPacketHandler,
+    private readonly onError?: TrafficErrorHandler,
+  ) {}
 
-  function scheduleReconnect() {
-    if (closedByUser || reconnectTimer !== undefined) {
-      return;
-    }
-
-    reconnectTimer = window.setTimeout(() => {
-      reconnectTimer = undefined;
-      connect();
-    }, RECONNECT_DELAY_MS);
-  }
-
-  function connect() {
+  connect() {
     if (
-      socket &&
-      (socket.readyState === WebSocket.CONNECTING || socket.readyState === WebSocket.OPEN)
+      this.socket &&
+      (this.socket.readyState === WebSocket.CONNECTING || this.socket.readyState === WebSocket.OPEN)
     ) {
       return;
     }
 
-    closedByUser = false;
-    socket = new WebSocket(getTrafficObserverUrl());
+    this.closedByUser = false;
+    this.socket = new WebSocket(getTrafficObserverUrl());
 
-    socket.addEventListener('message', (event) => {
+    this.socket.addEventListener('message', (event) => {
       try {
         const parsed = JSON.parse(event.data as string) as unknown;
         if (isTrafficPacketMessage(parsed)) {
-          onPacket(parsed);
+          this.onPacket(parsed);
         }
       } catch (error) {
         console.warn('Failed to parse traffic observer packet message.', error);
       }
     });
 
-    socket.addEventListener('error', (event) => {
-      onError?.(event);
+    this.socket.addEventListener('error', (event) => {
+      this.onError?.(event);
     });
 
-    socket.addEventListener('close', () => {
-      socket = undefined;
-      scheduleReconnect();
+    this.socket.addEventListener('close', () => {
+      this.socket = undefined;
+      this.scheduleReconnect();
     });
   }
 
-  function disconnect() {
-    closedByUser = true;
-    clearReconnectTimer();
-    socket?.close();
-    socket = undefined;
+  disconnect() {
+    this.closedByUser = true;
+    this.clearReconnectTimer();
+    this.socket?.close();
+    this.socket = undefined;
   }
 
-  return {
-    connect,
-    disconnect,
-  };
+  private clearReconnectTimer() {
+    if (this.reconnectTimer !== undefined) {
+      window.clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = undefined;
+    }
+  }
+
+  private scheduleReconnect() {
+    if (this.closedByUser || this.reconnectTimer !== undefined) {
+      return;
+    }
+
+    this.reconnectTimer = window.setTimeout(() => {
+      this.reconnectTimer = undefined;
+      this.connect();
+    }, RECONNECT_DELAY_MS);
+  }
 }

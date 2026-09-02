@@ -80,16 +80,6 @@ export const defaultRouters: RouteRecord[] = [
                 },
             },
             {
-                path: '/ixMap3D',
-                component: () => import('@/view/map/ixMap3D/ixMap3D.vue'),
-                name: 'ixMap3D',
-                meta: {
-                    title: "IXMap3D",
-                    icon: 'HomeFilled',
-                    componentName: 'IXMap3D',
-                },
-            },
-            {
                 path: '/transitMap',
                 component: () => import('@/view/map/transitMap/transitMap.vue'),
                 name: 'transitMap',

@@ -4,12 +4,22 @@ import (
 	"encoding/binary"
 	"fmt"
 	"net"
+	"sort"
+	"strings"
 	"time"
 )
 
 const (
 	DirectionIngress = 1
 	DirectionEgress  = 2
+	PacketCaptureMax = 65535
+
+	ipProtoICMP = 1
+	ipProtoTCP  = 6
+	ipProtoUDP  = 17
+
+	icmpEchoReply   = 0
+	icmpEchoRequest = 8
 )
 
 // Raw must stay layout-compatible with struct packet_event in bpf/packet_trace.h.
@@ -19,80 +29,89 @@ type Raw struct {
 	PacketLen   uint32
 	Direction   uint8
 	IPProto     uint8
-	EthProto    uint16
+	ICMPType    uint8
+	ICMPCode    uint8
 	SrcIP       uint32
 	DstIP       uint32
 	SrcPort     uint16
 	DstPort     uint16
+	ICMPID      uint16
+	ICMPSeq     uint16
+	TCPSeq      uint32
+	TCPAck      uint32
+	TCPFlags    uint8
+	Reserved    [3]byte
 	SrcMAC      [6]byte
 	DstMAC      [6]byte
-	TCPFlags    uint8
-	TTL         uint8
-	IPTotalLen  uint16
+	CapturedLen uint32
+	PacketData  [PacketCaptureMax]byte
 }
 
 type Packet struct {
 	Timestamp           time.Time `json:"timestamp"`
 	TimestampNS         uint64    `json:"timestampNs"`
-	HostIfIndex         uint32    `json:"hostIfIndex"`
-	HostIfName          string    `json:"hostIfName,omitempty"`
-	ContainerID         string    `json:"containerId,omitempty"`
+	ContainerID         string    `json:"-"`
 	ContainerName       string    `json:"containerName,omitempty"`
-	NodeID              string    `json:"nodeId,omitempty"`
+	IfName              string    `json:"ifName,omitempty"`
 	NodeName            string    `json:"nodeName,omitempty"`
+	NodeLabel           string    `json:"nodeLabel,omitempty"`
 	NodeIP              string    `json:"nodeIp,omitempty"`
-	NodeType            string    `json:"nodeType,omitempty"`
+	NetworkID           string    `json:"networkId,omitempty"`
 	NetworkName         string    `json:"networkName,omitempty"`
-	ContainerIfName     string    `json:"containerIfName,omitempty"`
-	ContainerIPv4       string    `json:"containerIpv4,omitempty"`
-	ContainerMAC        string    `json:"containerMac,omitempty"`
-	SourceContainerID   string    `json:"sourceContainerId,omitempty"`
+	NetworkLabel        string    `json:"networkLabel,omitempty"`
+	SourceContainerID   string    `json:"-"`
 	SourceContainerName string    `json:"sourceContainerName,omitempty"`
-	SourceNodeID        string    `json:"sourceNodeId,omitempty"`
 	SourceNodeName      string    `json:"sourceNodeName,omitempty"`
 	SourceNodeIP        string    `json:"sourceNodeIp,omitempty"`
-	SourceNodeType      string    `json:"sourceNodeType,omitempty"`
-	DestContainerID     string    `json:"destContainerId,omitempty"`
+	DestContainerID     string    `json:"-"`
 	DestContainerName   string    `json:"destContainerName,omitempty"`
-	DestNodeID          string    `json:"destNodeId,omitempty"`
 	DestNodeName        string    `json:"destNodeName,omitempty"`
 	DestNodeIP          string    `json:"destNodeIp,omitempty"`
-	DestNodeType        string    `json:"destNodeType,omitempty"`
-	Direction           string    `json:"direction"`
-	PacketLength        uint32    `json:"packetLength"`
-	EthProtocol         string    `json:"ethProtocol"`
-	SourceMAC           string    `json:"sourceMac"`
-	DestMAC             string    `json:"destMac"`
 	SourceIP            string    `json:"sourceIp"`
 	DestIP              string    `json:"destIp"`
 	IPProtocol          string    `json:"ipProtocol"`
+	FlowID              string    `json:"flowId,omitempty"`
+	PacketID            string    `json:"packetId,omitempty"`
+	PacketRole          string    `json:"packetRole,omitempty"`
+	PacketKind          string    `json:"packetKind,omitempty"`
 	SourcePort          uint16    `json:"sourcePort,omitempty"`
 	DestPort            uint16    `json:"destPort,omitempty"`
+	ICMPType            *uint8    `json:"icmpType,omitempty"`
+	ICMPCode            *uint8    `json:"icmpCode,omitempty"`
+	ICMPID              uint16    `json:"icmpId,omitempty"`
+	ICMPSeq             uint16    `json:"icmpSeq,omitempty"`
+	TCPSeq              uint32    `json:"tcpSeq,omitempty"`
+	TCPAck              uint32    `json:"tcpAck,omitempty"`
 	TCPFlags            string    `json:"tcpFlags,omitempty"`
-	TTL                 uint8     `json:"ttl"`
-	IPTotalLen          uint16    `json:"ipTotalLength"`
+	Direction           uint8     `json:"-"`
+	SourceMAC           string    `json:"-"`
+	DestMAC             string    `json:"-"`
 }
 
 func FromRaw(raw Raw, ifName string, timestamp time.Time) Packet {
-	return Packet{
-		Timestamp:    timestamp.UTC(),
-		TimestampNS:  raw.TimestampNS,
-		HostIfIndex:  raw.IfIndex,
-		HostIfName:   ifName,
-		Direction:    directionName(raw.Direction),
-		PacketLength: raw.PacketLen,
-		EthProtocol:  fmt.Sprintf("0x%04x", raw.EthProto),
-		SourceMAC:    net.HardwareAddr(raw.SrcMAC[:]).String(),
-		DestMAC:      net.HardwareAddr(raw.DstMAC[:]).String(),
-		SourceIP:     ipv4(raw.SrcIP),
-		DestIP:       ipv4(raw.DstIP),
-		IPProtocol:   protoName(raw.IPProto),
-		SourcePort:   raw.SrcPort,
-		DestPort:     raw.DstPort,
-		TCPFlags:     tcpFlags(raw.TCPFlags),
-		TTL:          raw.TTL,
-		IPTotalLen:   raw.IPTotalLen,
+	packet := Packet{
+		Timestamp:   timestamp.UTC(),
+		TimestampNS: raw.TimestampNS,
+		IfName:      ifName,
+		Direction:   raw.Direction,
+		SourceIP:    ipv4(raw.SrcIP),
+		DestIP:      ipv4(raw.DstIP),
+		IPProtocol:  protoName(raw.IPProto),
+		SourcePort:  raw.SrcPort,
+		DestPort:    raw.DstPort,
+		SourceMAC:   net.HardwareAddr(raw.SrcMAC[:]).String(),
+		DestMAC:     net.HardwareAddr(raw.DstMAC[:]).String(),
 	}
+	enrichPacketIdentity(&packet, raw)
+	return packet
+}
+
+func (r Raw) CapturedPacketData() []byte {
+	capturedLen := r.CapturedLen
+	if capturedLen > PacketCaptureMax {
+		capturedLen = PacketCaptureMax
+	}
+	return r.PacketData[:capturedLen]
 }
 
 func ipv4(value uint32) string {
@@ -114,39 +133,129 @@ func directionName(value uint8) string {
 
 func protoName(value uint8) string {
 	switch value {
-	case 1:
+	case ipProtoICMP:
 		return "icmp"
-	case 6:
+	case ipProtoTCP:
 		return "tcp"
-	case 17:
+	case ipProtoUDP:
 		return "udp"
 	default:
 		return fmt.Sprintf("ip-%d", value)
 	}
 }
 
-func tcpFlags(value uint8) string {
-	if value == 0 {
-		return ""
+func enrichPacketIdentity(packet *Packet, raw Raw) {
+	switch raw.IPProto {
+	case ipProtoICMP:
+		packet.ICMPType = uint8Ptr(raw.ICMPType)
+		packet.ICMPCode = uint8Ptr(raw.ICMPCode)
+		packet.ICMPID = raw.ICMPID
+		packet.ICMPSeq = raw.ICMPSeq
+		packet.PacketRole, packet.PacketKind = icmpPacketRoleAndKind(raw.ICMPType)
+		packet.FlowID = icmpFlowID(packet.SourceIP, packet.DestIP, raw.ICMPType, raw.ICMPID)
+		packet.PacketID = fmt.Sprintf(
+			"icmp|%s>%s|type=%d|code=%d|id=%d|seq=%d",
+			packet.SourceIP,
+			packet.DestIP,
+			raw.ICMPType,
+			raw.ICMPCode,
+			raw.ICMPID,
+			raw.ICMPSeq,
+		)
+	case ipProtoTCP:
+		packet.TCPSeq = raw.TCPSeq
+		packet.TCPAck = raw.TCPAck
+		packet.TCPFlags = tcpFlagsName(raw.TCPFlags)
+		packet.PacketRole = "forward"
+		packet.PacketKind = "tcp"
+		if packet.TCPFlags != "" {
+			packet.PacketKind = "tcp-" + strings.ToLower(strings.ReplaceAll(packet.TCPFlags, "|", "-"))
+		}
+		packet.FlowID = unorderedEndpointFlowID("tcp", packet.SourceIP, raw.SrcPort, packet.DestIP, raw.DstPort, "")
+		packet.PacketID = fmt.Sprintf(
+			"tcp|%s:%d>%s:%d|seq=%d|ack=%d|flags=%s",
+			packet.SourceIP,
+			raw.SrcPort,
+			packet.DestIP,
+			raw.DstPort,
+			raw.TCPSeq,
+			raw.TCPAck,
+			packet.TCPFlags,
+		)
+	case ipProtoUDP:
+		packet.PacketRole = "forward"
+		packet.PacketKind = "udp"
+		packet.FlowID = unorderedEndpointFlowID("udp", packet.SourceIP, raw.SrcPort, packet.DestIP, raw.DstPort, "")
+		packet.PacketID = fmt.Sprintf(
+			"udp|%s:%d>%s:%d|ts=%d",
+			packet.SourceIP,
+			raw.SrcPort,
+			packet.DestIP,
+			raw.DstPort,
+			raw.TimestampNS,
+		)
+	default:
+		packet.PacketRole = "forward"
+		packet.PacketKind = packet.IPProtocol
+		packet.FlowID = unorderedEndpointFlowID(packet.IPProtocol, packet.SourceIP, 0, packet.DestIP, 0, "")
+		packet.PacketID = fmt.Sprintf("%s|%s>%s|ts=%d", packet.IPProtocol, packet.SourceIP, packet.DestIP, raw.TimestampNS)
 	}
-	flags := ""
-	if value&0x01 != 0 {
-		flags += "FIN,"
+}
+
+func icmpPacketRoleAndKind(icmpType uint8) (string, string) {
+	switch icmpType {
+	case icmpEchoRequest:
+		return "request", "icmp-echo-request"
+	case icmpEchoReply:
+		return "reply", "icmp-echo-reply"
+	default:
+		return "control", fmt.Sprintf("icmp-type-%d", icmpType)
 	}
-	if value&0x02 != 0 {
-		flags += "SYN,"
+}
+
+func icmpFlowID(sourceIP string, destIP string, icmpType uint8, icmpID uint16) string {
+	if icmpType == icmpEchoReply {
+		return fmt.Sprintf("icmp|%s>%s|id=%d", destIP, sourceIP, icmpID)
 	}
-	if value&0x04 != 0 {
-		flags += "RST,"
+	return fmt.Sprintf("icmp|%s>%s|id=%d", sourceIP, destIP, icmpID)
+}
+
+func unorderedEndpointFlowID(protocol string, sourceIP string, sourcePort uint16, destIP string, destPort uint16, extra string) string {
+	endpoints := []string{
+		fmt.Sprintf("%s:%d", sourceIP, sourcePort),
+		fmt.Sprintf("%s:%d", destIP, destPort),
 	}
-	if value&0x08 != 0 {
-		flags += "PSH,"
+	sort.Strings(endpoints)
+	parts := []string{protocol, endpoints[0], endpoints[1]}
+	if extra != "" {
+		parts = append(parts, extra)
 	}
-	if value&0x10 != 0 {
-		flags += "ACK,"
+	return strings.Join(parts, "|")
+}
+
+func tcpFlagsName(flags uint8) string {
+	names := make([]string, 0, 6)
+	if flags&0x01 != 0 {
+		names = append(names, "FIN")
 	}
-	if value&0x20 != 0 {
-		flags += "URG,"
+	if flags&0x02 != 0 {
+		names = append(names, "SYN")
 	}
-	return flags[:len(flags)-1]
+	if flags&0x04 != 0 {
+		names = append(names, "RST")
+	}
+	if flags&0x08 != 0 {
+		names = append(names, "PSH")
+	}
+	if flags&0x10 != 0 {
+		names = append(names, "ACK")
+	}
+	if flags&0x20 != 0 {
+		names = append(names, "URG")
+	}
+	return strings.Join(names, "|")
+}
+
+func uint8Ptr(value uint8) *uint8 {
+	return &value
 }

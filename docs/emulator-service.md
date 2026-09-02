@@ -34,3 +34,7 @@ flowchart LR
 - 容器名：`emulator-service`
 - 默认端口：`7071`
 - 挂载：`/var/run/docker.sock`
+
+## 测试覆盖
+
+Mermaid 测试覆盖图见 [emulator-service-testing.md](./test/emulator-service-testing.md)。

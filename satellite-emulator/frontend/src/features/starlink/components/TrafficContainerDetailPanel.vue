@@ -1,29 +1,19 @@
 <template>
-  <section
+  <AnchoredDetailPanel
     v-if="visible && detail"
-    ref="panelRef"
-    class="satellite-detail-panel"
-    :style="panelStyle"
-  >
-    <header @pointerdown="startDrag">
-      <span>{{ detail.nodeName }}</span>
-      <button type="button" aria-label="Close container details" @click="$emit('close')">x</button>
-    </header>
-
-    <div class="satellite-detail">
-      <dl>
-        <div v-for="row in rows" :key="row.label">
-          <dt>{{ row.label }}</dt>
-          <dd>{{ row.value }}</dd>
-        </div>
-      </dl>
-    </div>
-  </section>
+    :visible="visible"
+    :title="detail.nodeName"
+    :rows="rows"
+    :anchor="anchor"
+    :identity="detail.containerId"
+    close-label="Close container details"
+    @close="$emit('close')"
+  />
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { useAnchoredDetailPanel } from '@/features/starlink/composables/useAnchoredDetailPanel';
+import AnchoredDetailPanel from '@/features/starlink/components/AnchoredDetailPanel.vue';
 import type {
   SatelliteDetailRow,
   ScreenAnchor,
@@ -58,12 +48,4 @@ const rows = computed<SatelliteDetailRow[]>(() =>
 function formatCoordinate(value: number | undefined) {
   return value === undefined ? '-' : value.toFixed(5);
 }
-
-const { panelRef, panelStyle, startDrag } = useAnchoredDetailPanel({
-  anchor: () => props.anchor,
-  active: () => props.visible && Boolean(props.detail),
-  identity: () => props.detail?.containerId,
-});
 </script>
-
-<style scoped lang="scss" src="@/features/starlink/styles/satellite-detail-panel.scss"></style>

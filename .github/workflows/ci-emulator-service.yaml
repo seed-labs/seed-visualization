@@ -1,0 +1,117 @@
+name: CI Emulator Service
+
+on:
+  # pull_request:
+  #   branches:
+  #     - main
+  #   paths:
+  #     - "emulator-service/**"
+  #     - "docker-compose.yml"
+  #     - ".github/workflows/ci-emulator-service.yaml"
+  # push:
+  #   branches:
+  #     - main
+  #   paths:
+  #     - "emulator-service/**"
+  #     - "docker-compose.yml"
+  #     - ".github/workflows/ci-emulator-service.yaml"
+  workflow_call:
+    inputs:
+      run-static-checks:
+        type: boolean
+        required: false
+        default: true
+      run-unit-tests:
+        type: boolean
+        required: false
+        default: true
+      run-integration-tests:
+        type: boolean
+        required: false
+        default: true
+      run-docker-build:
+        type: boolean
+        required: false
+        default: true
+  workflow_dispatch:
+    inputs:
+      run-static-checks:
+        description: "Run static checks"
+        type: boolean
+        required: false
+        default: true
+      run-unit-tests:
+        description: "Run unit tests"
+        type: boolean
+        required: false
+        default: true
+      run-integration-tests:
+        description: "Run lightweight integration tests"
+        type: boolean
+        required: false
+        default: true
+      run-docker-build:
+        description: "Build Docker image"
+        type: boolean
+        required: false
+        default: true
+
+env:
+  NODE_VERSION: "22"
+
+jobs:
+  emulator-service:
+    name: Emulator Service
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: emulator-service
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        if: ${{ github.event_name != 'workflow_dispatch' || inputs.run-static-checks }}
+        run: npm run lint
+
+      - name: Unit tests
+        if: ${{ github.event_name != 'workflow_dispatch' || inputs.run-unit-tests }}
+        env:
+          TEST_COVERAGE_SCOPE: |
+            - api/v1 router: container listing, non-SEED filtering, unknown routes, unique container prefix matching, ambiguous prefix rejection, and sanitized Docker errors.
+            - api/v1 network operations: network metadata listing, network status reads, and network status change request forwarding.
+            - api/v1 node operations: container details, BGP peer listing, BGP peer state changes, packet capture validation, packet capture startup, and sniffer filter persistence.
+            - config/env: development and production environment loading, NODE_ENV=test behavior, real environment precedence, and Docker endpoint defaults.
+            - utils/controller: net_status output parsing and BGP peer row parsing.
+            - utils/docker-client: local daemon defaults, DOCKER_HOST/DOCKER_PORT parsing, tcp/http/https endpoint parsing, and socket path handling.
+            - utils/seedemu-meta and submit-event: SEED label parsing and runtime command execution/error propagation.
+        run: npm run test:unit
+
+      - name: Integration tests
+        if: ${{ github.event_name != 'workflow_dispatch' || inputs.run-integration-tests }}
+        env:
+          TEST_COVERAGE_SCOPE: |
+            - remote Docker API path: runtime frontend environment, container listing, network listing, specific container lookup, missing container errors, and invalid network-status requests.
+            - plugin API path: configured plugin listing, rejected unknown install requests, and uninstall requests without container file mutation.
+            - host event path: visualization event broadcasting through the API endpoint.
+            - packet capture path: current sniffer filter retrieval and invalid target-node errors.
+            - BGP path: invalid BGP peer listing and invalid BGP peer state-change handling.
+        run: npm run test:integration
+
+      - name: Build
+        run: npm run build
+
+      - name: Docker build
+        if: ${{ github.event_name != 'workflow_dispatch' || inputs.run-docker-build }}
+        working-directory: .
+        run: docker compose build seedemu_emulator_service

@@ -1,0 +1,73 @@
+import {
+  analyzePacketFlow,
+  type PacketFlowAnalysis,
+  type PacketFlowAnalysisOptions,
+} from './packetFlowAnalyzer'
+import type { EmulatorTopologyPacketReplayEvent } from './packetReplayFileService'
+
+type AnalyzeRequest = {
+  id: number
+  type: 'analyze'
+  events: EmulatorTopologyPacketReplayEvent[]
+  options?: PacketFlowAnalysisOptions
+}
+
+type WorkerRequest = AnalyzeRequest
+
+type WorkerResolved = {
+  id: number
+  type: 'resolved'
+  analysis: PacketFlowAnalysis
+}
+
+type WorkerUnresolved = {
+  id: number
+  type: 'unresolved'
+  reason: string
+}
+
+type WorkerFailure = {
+  id: number
+  type: 'error'
+  error: string
+}
+
+export type PacketFlowWorkerResponse = WorkerResolved | WorkerUnresolved | WorkerFailure
+
+function handleAnalyze(request: AnalyzeRequest): PacketFlowWorkerResponse {
+  if (!request.events.length) {
+    return {
+      id: request.id,
+      type: 'unresolved',
+      reason: 'No packets to analyze.',
+    }
+  }
+
+  const analysis = analyzePacketFlow(request.events, request.options)
+  if (analysis.pathSteps.length === 0 || analysis.pathSegments.length === 0) {
+    return {
+      id: request.id,
+      type: 'unresolved',
+      reason: 'Packet flow path could not be resolved from the current packets.',
+    }
+  }
+
+  return {
+    id: request.id,
+    type: 'resolved',
+    analysis,
+  }
+}
+
+self.onmessage = (event: MessageEvent<WorkerRequest>) => {
+  const request = event.data
+  try {
+    postMessage(handleAnalyze(request))
+  } catch (error) {
+    postMessage({
+      id: request.id,
+      type: 'error',
+      error: error instanceof Error ? error.message : String(error),
+    } satisfies WorkerFailure)
+  }
+}

@@ -2,7 +2,6 @@ package sink
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/url"
 	"time"
@@ -38,12 +37,14 @@ type stdoutSink struct{}
 
 func (stdoutSink) Name() string { return "stdout" }
 func (stdoutSink) Close() error { return nil }
-func (stdoutSink) Send(_ context.Context, value any) error {
-	data, err := json.Marshal(value)
-	if err != nil {
-		return err
-	}
-	fmt.Println(string(data))
+func (stdoutSink) Send(_ context.Context, _ any) error {
+	// Packet JSON stdout output is intentionally disabled for now.
+	// Keep the stdout sink as a no-op fallback when EMULATOR_SERVICE_TRAFFIC_URL is empty.
+	// data, err := json.Marshal(value)
+	// if err != nil {
+	// 	return err
+	// }
+	// fmt.Println(string(data))
 	return nil
 }
 

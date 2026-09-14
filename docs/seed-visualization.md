@@ -6,9 +6,9 @@
 
 | 项目 | 目录 | 作用 | 文档 | 测试文档 |
 | --- | --- | --- | --- | --- |
-| `internet-map` | `internet-map/` | 经典 2D Internet Map 前端，包含传统拓扑、IX、Transit、Dashboard、Plugin、Console 等页面。 | [internet-map.md](./internet-map.md) | [internet-map-testing.md](./test/internet-map-testing.md) |
-| `internet-map-globe` | `internet-map-globe/` | Cesium 拓扑前端，包含 3D 地球和 2D 平铺地图，支持实时 Docker API 数据和上传文件数据。 | [internet-map-globe.md](./internet-map-globe.md) | [internet-map-globe-testing.md](./test/internet-map-globe-testing.md) |
-| `satellite-emulator` | `satellite-emulator/` | 卫星可视化前端和 Nginx 入口，展示卫星、地面站、链路、容器叠加和流量回放。 | [satellite-emulator.md](./satellite-emulator.md) | [satellite-emulator-testing.md](./test/satellite-emulator-testing.md) |
+| `InternetMap-Toplogy` | `InternetMap-Toplogy/` | 经典 2D InternetMap-Toplogy 前端，包含传统拓扑、IX、Transit、Dashboard、Plugin、Console 等页面。 | [internet-map-toplogy.md](./internet-map-toplogy.md) | [internet-map-toplogy-testing.md](./test/internet-map-toplogy-testing.md) |
+| `InternetMap-Geographic` | `InternetMap-Geographic/` | Cesium 拓扑前端，包含 3D 地球和 2D 平铺地图，支持实时 Docker API 数据和上传文件数据。 | [internet-map-geographic.md](./internet-map-geographic.md) | [internet-map-geographic-testing.md](./test/internet-map-geographic-testing.md) |
+| `InternetMap-Satellite` | `InternetMap-Satellite/` | 卫星可视化前端和 Nginx 入口，展示卫星、地面站、链路、容器叠加和流量回放。 | [internet-map-satellite.md](./internet-map-satellite.md) | [internet-map-satellite-testing.md](./test/internet-map-satellite-testing.md) |
 | `satellite-emulator-service` | `satellite-emulator-service/` | 卫星 API 服务，提供轨道、gateway、卫星链路等数据。 | [satellite-emulator-service.md](./satellite-emulator-service.md) | [satellite-emulator-service-testing.md](./test/satellite-emulator-service-testing.md) |
 | `traffic-observer-service` | `traffic-observer-service/` | Go + eBPF 抓包服务，提供 filter 控制、packet WebSocket，以及可选 PCAP / JSON 记录。 | [traffic-observer-service.md](./traffic-observer-service.md) | [traffic-observer-service-testing.md](./test/traffic-observer-service-testing.md) |
 | `emulator-service` | `emulator-service/` | 仿真器 API 聚合服务，封装 Docker 容器、网络、终端、sniffer、插件等能力。 | [emulator-service.md](./emulator-service.md) | [emulator-service-testing.md](./test/emulator-service-testing.md) |
@@ -19,9 +19,9 @@
 ```mermaid
 flowchart TB
   subgraph FrontendLayer["前端层"]
-    IM["internet-map<br/>经典 2D 前端"]
-    IMG["internet-map-globe<br/>Cesium 3D / 2D 前端"]
-    SAT["satellite-emulator<br/>卫星前端"]
+    IM["InternetMap-Toplogy<br/>经典 2D 前端"]
+    IMG["InternetMap-Geographic<br/>Cesium 3D / 2D 前端"]
+    SAT["InternetMap-Satellite<br/>卫星前端"]
   end
 
   subgraph ApiLayer["API 与抓包层"]
@@ -56,26 +56,26 @@ flowchart TB
 根目录 `docker-compose.yml` 当前包含以下 service key：
 
 - `seedemu_emulator_service`
-- `seedemu_internet_map`
-- `seedemu_internet_map_globe`
-- `seedemu_satellite_emulator`
+- `seedemu_internet_map_toplogy`
+- `seedemu_internet_map_geographic`
+- `seedemu_internet_map_satellite`
 - `seedemu_satellite_emulator_service`
 - `seedmu_traffic_observer_service`
 
 默认端口：
 
-- Internet Map：`http://localhost:8080`
-- Internet Map Globe：`http://localhost:8090`
-- Satellite Emulator：`http://localhost:9090`
+- InternetMap-Toplogy：`http://localhost:8080`
+- InternetMap-Geographic：`http://localhost:8090`
+- InternetMap-Satellite：`http://localhost:9090`
 - emulator-service API：`http://localhost:7071`
 - satellite-emulator-service API：`http://localhost:9091`
 - traffic-observer-service control / WebSocket：`http://localhost:19092`
 
 ## 项目文档
 
-- [internet-map](./internet-map.md)
-- [internet-map-globe](./internet-map-globe.md)
-- [satellite-emulator](./satellite-emulator.md)
+- [InternetMap-Toplogy](./internet-map-toplogy.md)
+- [InternetMap-Geographic](./internet-map-geographic.md)
+- [InternetMap-Satellite](./internet-map-satellite.md)
 - [satellite-emulator-service](./satellite-emulator-service.md)
 - [traffic-observer-service](./traffic-observer-service.md)
 - [emulator-service](./emulator-service.md)

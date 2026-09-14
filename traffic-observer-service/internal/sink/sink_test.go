@@ -23,7 +23,7 @@ func TestNewReturnsStdoutSinkWhenURLIsEmpty(t *testing.T) {
 		t.Fatalf("unexpected sink name: %s", s.Name())
 	}
 	if err := s.Send(context.Background(), map[string]string{"type": "packet"}); err != nil {
-		t.Fatalf("stdout sink should marshal JSON values: %v", err)
+		t.Fatalf("stdout sink should accept packet values without printing: %v", err)
 	}
 }
 

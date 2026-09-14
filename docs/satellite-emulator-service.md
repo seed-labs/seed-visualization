@@ -1,6 +1,6 @@
-﻿# satellite-emulator-service
+# satellite-emulator-service
 
-`satellite-emulator-service` 是 `satellite-emulator` 独立服务。
+`satellite-emulator-service` 是 `InternetMap-Satellite` 独立服务。
 
 ## 职责
 
@@ -22,7 +22,7 @@
 ```mermaid
 %%{init: {"flowchart": {"useMaxWidth": true, "htmlLabels": true}} }%%
 flowchart LR
-  Frontend["satellite-emulator"]
+  Frontend["InternetMap-Satellite"]
   API["satellite-emulator-service"]
   Tmp["satellite-emulator-service/tmp<br/>planned_shell_orbit / starlink_gateways / links"]
   External["外部脚本 / 用户"]

@@ -6,8 +6,9 @@ Use the local CI runner to reproduce those jobs on a development machine.
 ```bash
 python scripts/local_ci.py --list
 python scripts/local_ci.py --all-workflows
-python scripts/local_ci.py --workflow ci-internet-map.yaml
-python scripts/local_ci.py --workflow ci-satellite-emulator.yaml --skip-e2e
+python scripts/local_ci.py --workflow ci-internet-map-toplogy.yaml
+python scripts/local_ci.py --workflow ci-internet-map-geographic.yaml
+python scripts/local_ci.py --workflow ci-internet-map-satellite.yaml --skip-e2e
 python scripts/local_ci.py --workflow ci-traffic-observer-service.yaml --dry-run
 ```
 
@@ -58,16 +59,41 @@ docker pull debian:bookworm-slim
 ## Common commands
 
 ```bash
-python scripts/local_ci.py --workflow ci-internet-map.yaml --dry-run
-python scripts/local_ci.py --workflow ci-internet-map.yaml --skip-install
-python scripts/local_ci.py --workflow ci-internet-map.yaml --skip-e2e
-python scripts/local_ci.py --workflow ci-internet-map.yaml --no-tool-install
+python scripts/local_ci.py --workflow ci-internet-map-toplogy.yaml --dry-run
+python scripts/local_ci.py --workflow ci-internet-map-toplogy.yaml --skip-install
+python scripts/local_ci.py --workflow ci-internet-map-toplogy.yaml --skip-e2e
+python scripts/local_ci.py --workflow ci-internet-map-toplogy.yaml --no-tool-install
 python scripts/local_ci.py --all-workflows --dry-run
 python scripts/local_ci.py --all-workflows --skip-e2e --skip-docker
 python scripts/local_ci.py --workflow ci-traffic-observer-service.yaml --ubuntu-install-source apt
 python scripts/local_ci.py --workflow ci-docker-lifecycle.yaml --skip-docker
 python scripts/local_ci.py --workflow ci-traffic-observer-service.yaml --skip-static
 ```
+
+## Run Docker lifecycle probes manually
+
+From the repository root on a Linux test host with Bash, curl, Docker Engine,
+and Docker Compose v2:
+
+```bash
+docker compose build
+bash ci/probe-docker-compose.sh
+```
+
+The script starts the services, checks frontend pages and backend HTTP endpoints,
+and saves logs to `ci-artifacts/docker-lifecycle/logs/`. It does not run unit tests
+or browser E2E tests. The traffic observer starts as a dependency; packet capture
+is not tested by this script.
+
+On exit, including probe failure, it saves logs and runs
+`docker compose down --remove-orphans` for the test project. The default project
+name is `seed-visualization-ci`. Fixed container names and host ports prevent
+parallel execution alongside an existing deployment, even with a different
+project name. Use an idle test host with the Linux kernel support required by
+the privileged traffic observer service.
+
+See [Docker lifecycle instructions](../../ci/README.md) for environment variables,
+ports, cleanup behavior, and manual GitHub Actions execution.
 
 ## Notes
 

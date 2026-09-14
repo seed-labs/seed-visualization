@@ -1,8 +1,8 @@
 ﻿## Project layout
 
 - `emulator-service/`: shared API backend for emulator container, network, console, sniffer, packet, and plugin APIs.
-- `internet-map/`: Internet Map frontend. Its container serves the frontend and proxies `/api/v1` to `emulator-service`.
-- `satellite-emulator/`: Satellite Emulator frontend and Nginx proxy.
+- `InternetMap-Toplogy/`: Internet Map frontend. Its container serves the frontend and proxies `/api/v1` to `emulator-service`.
+- `InternetMap-Satellite/`: Satellite Emulator frontend and Nginx proxy.
 - `satellite-emulator-service/`: satellite-specific API and WebSocket service for link updates and network node metadata.
 - `traffic-observer-service/`: privileged eBPF + Go collector service for packet metadata observation.
 - `shared/`: shared libraries used by multiple services.

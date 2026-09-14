@@ -1,4 +1,4 @@
-﻿# traffic-observer-service
+# traffic-observer-service
 
 `traffic-observer-service` 是原 `traffic-observer` 重命名后的服务，负责通过 eBPF 抓取容器虚拟网卡上的 packet metadata，并可按需将原始 packet 保存为 pcap 文件、将前端 WebSocket 事件批量保存为 JSON 文件。
 
@@ -63,7 +63,7 @@ eBPF 程序在 filter 命中后向 ringbuf 提交：
 ```mermaid
 %%{init: {"flowchart": {"useMaxWidth": true, "htmlLabels": true}} }%%
 flowchart TB
-  UI["Satellite / Internet Map 前端"]
+  UI["InternetMap-Satellite / InternetMap-Geographic / InternetMap-Toplogy 前端"]
   Control["Control Server<br/>GET/PUT /filter"]
   PcapControl["PCAP Control<br/>GET/PUT /pcap"]
   WS["Packet WS<br/>/ws/packets"]

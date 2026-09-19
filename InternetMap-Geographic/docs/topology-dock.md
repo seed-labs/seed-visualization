@@ -168,7 +168,7 @@ Playback modes are mutually exclusive:
 | Mode | Description |
 | --- | --- |
 | Interval | Replays packets one by one with a fixed interval. |
-| Timeline | Replays packets according to their real timestamps, scaled by Timeline speed. |
+| Timeline | Groups packets by timestamp and replays each group according to Timeline speed. |
 
 ### Interval
 
@@ -201,7 +201,9 @@ For example, if two packets are 1000 ms apart:
 `Time window (ms)` groups packets into scheduling windows.
 
 - `Time window = 0`: no windowing; replay strictly follows real packet timestamps.
-- `Time window > 0`: packets inside the window can be scheduled by their relative timestamp offsets, which is better for observing concurrent multi-flow animations.
+- `Time window > 0` on live pages: all recorded packets in one window are treated as simultaneous. The Packet axis advances by the actual packet count in that batch. The delay before the next batch is the gap between the current batch's last packet and the next batch's first packet, divided by Timeline speed.
+- Flow animation changes a live batch from node highlights to inferred path animations; it does not change batch boundaries, Packet-axis progress, or playback timing.
+- If Flow animation still needs path analysis when playback starts, or it is enabled during an active replay, the play button shows a loading state and the panel displays a red calculation message. Playback starts or resumes from its current position after analysis finishes.
 
 ## Packet path links only
 

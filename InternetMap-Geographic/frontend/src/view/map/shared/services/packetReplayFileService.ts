@@ -306,6 +306,11 @@ function parseOfflinePacketFilter(expression: string): OfflinePacketFilter {
     const next = tokens[index + 1]
     const afterNext = tokens[index + 2]
 
+    if (token === 'and' || token === '&&' || token === 'or' || token === '||') {
+      filter.recognizedTokens += 1
+      continue
+    }
+
     const protocolNumber = parseProtocolFilterValue(token)
     if (protocolNumber !== undefined) {
       filter.protocols.add(protocolNumber)

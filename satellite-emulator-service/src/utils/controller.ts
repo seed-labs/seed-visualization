@@ -86,54 +86,51 @@ export class Controller implements LogProducer {
         this._logger.debug(`got new session for node ${nodeId}; attaching listener...`);
 
         session.stream.addListener('data', data => {
-            var message: string = data.toString('utf-8');
+            const message: string = data.toString('utf-8');
             this._logger.debug(`message chunk from ${nodeId}: ${message}`);
+            this._consumeMessageChunk(nodeId, message);
+        });
+    }
 
-            if (message.includes('_BEGIN_RESULT_')) {
-                if (nodeId in this._messageBuffer && this._messageBuffer[nodeId] != '') {
-                    this._logger.error(`${nodeId} sents another _BEGIN_RESULT_ while the last message was not finished.`);
-                }
+    private _consumeMessageChunk(nodeId: string, message: string) {
+        const beginMarker = '_BEGIN_RESULT_';
+        const endMarker = '_END_RESULT_';
+        let buffer = (this._messageBuffer[nodeId] || '') + message;
 
-                this._messageBuffer[nodeId] = '';
+        while (true) {
+            const begin = buffer.indexOf(beginMarker);
+            if (begin < 0) {
+                this._messageBuffer[nodeId] = buffer.slice(-(beginMarker.length - 1));
+                return;
             }
-
-            if (!(nodeId in this._messageBuffer)) {
-                this._messageBuffer[nodeId] = message;
-            } else {
-                this._messageBuffer[nodeId] += message;
+            const payloadStart = begin + beginMarker.length;
+            const end = buffer.indexOf(endMarker, payloadStart);
+            const nestedBegin = buffer.indexOf(beginMarker, payloadStart);
+            if (nestedBegin >= 0 && (end < 0 || nestedBegin < end)) {
+                this._logger.warn(`${nodeId} started a new result before finishing the previous one; discarding the incomplete frame.`);
+                buffer = buffer.slice(nestedBegin);
+                continue;
             }
-            
-            if (!this._messageBuffer[nodeId].includes('_END_RESULT_')) {
-                this._logger.debug(`message from ${nodeId} is not complete; push to buffer and wait...`);
+            if (end < 0) {
+                this._messageBuffer[nodeId] = buffer.slice(begin);
                 return;
             }
 
-            let json = this._messageBuffer[nodeId]?.split('_BEGIN_RESULT_')[1]?.split('_END_RESULT_')[0];
-
-            if (!json) {
-                this._logger.warn(`end-of-message seen, but messsage incomplete for node ${nodeId}?`);
-                return;
-            }
-
+            const json = buffer.slice(payloadStart, end);
+            buffer = buffer.slice(end + endMarker.length);
             this._logger.debug(`message from ${nodeId}: "${json}"`);
-
-            // message should be completed by now. parse and resolve.
-
             try {
-                let result = JSON.parse(json) as ExecutionResult;
-
+                const result = JSON.parse(json) as ExecutionResult;
                 if (result.id in this._unresolvedPromises) {
                     this._unresolvedPromises[result.id](result);
                     delete this._unresolvedPromises[result.id];
                 } else {
-                    this._logger.warn(`unknow task id ${result.id} from node ${nodeId}: `, result);
+                    this._logger.warn(`unknown task id ${result.id} from node ${nodeId}: `, result);
                 }
             } catch (e) {
                 this._logger.warn(`error decoding message from ${nodeId}: `, e);
             }
-
-            this._messageBuffer[nodeId] = '';
-        });
+        }
     }
 
     /**

@@ -16,7 +16,7 @@
       <el-input
         v-model="filterInput"
         size="small"
-        placeholder="tcpdump-like filter, e.g. icmp"
+        placeholder="e.g. icmp or udp"
         :disabled="filterSubmitting"
         clearable
         @keyup.enter="$emit('submitFilter')"
@@ -145,7 +145,7 @@
           type="button"
           class="emulator-traffic-icon-button record"
           :class="{ active: recordingEnabled }"
-          :disabled="!captureActive || playbackEnabled"
+          :disabled="!captureActive || playbackEnabled || playbackPreparing"
           @click="$emit('toggleRecording')"
         >
           <el-icon>
@@ -156,19 +156,19 @@
       <button
         type="button"
         class="emulator-traffic-icon-button"
-        :class="{ active: playbackEnabled && !playbackPaused }"
-        :disabled="recordingEnabled || !packetCount"
-        :data-tooltip="playbackEnabled && !playbackPaused ? 'Pause replay' : 'Play replay'"
+        :class="{ active: playbackEnabled && !playbackPaused, 'is-loading': playbackPreparing }"
+        :disabled="recordingEnabled || playbackPreparing || !packetCount"
+        :data-tooltip="playbackPreparing ? 'Calculating packet paths' : playbackEnabled && !playbackPaused ? 'Pause replay' : 'Play replay'"
         @click="$emit('togglePlayback')"
       >
-        <el-icon>
-          <component :is="playbackEnabled && !playbackPaused ? VideoPause : VideoPlay" />
+        <el-icon :class="{ 'is-loading': playbackPreparing }">
+          <component :is="playbackPreparing ? Loading : playbackEnabled && !playbackPaused ? VideoPause : VideoPlay" />
         </el-icon>
       </button>
       <button
         type="button"
         class="emulator-traffic-icon-button"
-        :disabled="recordingEnabled || !packetCount"
+        :disabled="recordingEnabled || playbackPreparing || !packetCount"
         data-tooltip="Stop replay"
         @click="$emit('stopPlayback')"
       >
@@ -179,7 +179,7 @@
       <button
         type="button"
         class="emulator-traffic-icon-button"
-        :disabled="recordingEnabled || !packetCount"
+        :disabled="recordingEnabled || playbackPreparing || !packetCount"
         data-tooltip="Previous packet"
         @click="$emit('jumpPlayback', -1)"
       >
@@ -190,7 +190,7 @@
       <button
         type="button"
         class="emulator-traffic-icon-button"
-        :disabled="recordingEnabled || !packetCount"
+        :disabled="recordingEnabled || playbackPreparing || !packetCount"
         data-tooltip="Next packet"
         @click="$emit('jumpPlayback', 1)"
       >
@@ -201,7 +201,7 @@
       <button
         type="button"
         class="emulator-traffic-clear-button"
-        :disabled="recordingEnabled || playbackEnabled || !packetCount"
+        :disabled="recordingEnabled || playbackEnabled || playbackPreparing || !packetCount"
         data-tooltip="Clear packets"
         @click="$emit('clearPlayback')"
       >
@@ -214,6 +214,7 @@
     <label class="emulator-traffic-replay-seek">
       <span>Packet</span>
       <el-slider
+        :key="packetCount > 0 ? 'packets' : 'empty'"
         class="emulator-traffic-replay-slider"
         :min="0"
         :max="packetCount"
@@ -228,7 +229,9 @@
       <em>{{ seekPosition }} / {{ packetCount.toLocaleString() }}</em>
     </label>
 
-    <p>{{ rangeLabel }}</p>
+    <p :class="{ 'emulator-traffic-replay-calculating': playbackPreparing }">
+      {{ rangeLabel }}
+    </p>
   </div>
 </template>
 
@@ -240,6 +243,7 @@ import {
   Right,
   SwitchButton,
   VideoCameraFilled,
+  Loading,
   VideoPause,
   VideoPlay,
 } from '@element-plus/icons-vue'
@@ -255,6 +259,8 @@ const props = defineProps<{
   seekPosition: number
   playbackEnabled: boolean
   playbackPaused: boolean
+  playbackPreparing?: boolean
+  playbackStatusText?: string
 }>()
 
 const filterInput = defineModel<string>('filterInput', { required: true })
@@ -277,6 +283,9 @@ const emit = defineEmits<{
 }>()
 
 const rangeLabel = computed(() => {
+  if (props.playbackPreparing) {
+    return props.playbackStatusText || 'Calculating packet flow paths...'
+  }
   if (props.recordingEnabled) {
     return `Recording live packets: ${props.packetCount.toLocaleString()} captured.`
   }

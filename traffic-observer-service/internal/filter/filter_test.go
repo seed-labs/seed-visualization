@@ -53,6 +53,18 @@ func TestParseHostAndPortMatchEitherSide(t *testing.T) {
 	}
 }
 
+func TestParseProtocolOrExpression(t *testing.T) {
+	cfg, err := Parse("icmp or tcp or udp")
+	if err != nil {
+		t.Fatalf("Parse returned error: %v", err)
+	}
+
+	want := uint8(ProtoMaskICMP | ProtoMaskTCP | ProtoMaskUDP)
+	if cfg.IPProto != ProtoAny || cfg.ProtocolMask != want {
+		t.Fatalf("expected protocol mask %d, got IPProto=%d ProtocolMask=%d", want, cfg.IPProto, cfg.ProtocolMask)
+	}
+}
+
 func TestParseRejectsInvalidExpressions(t *testing.T) {
 	cases := []string{
 		"src host not-an-ip",

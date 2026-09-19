@@ -14,6 +14,10 @@ const (
 	ProtoTCP  = 6
 	ProtoUDP  = 17
 
+	ProtoMaskICMP = 1 << 0
+	ProtoMaskTCP  = 1 << 1
+	ProtoMaskUDP  = 1 << 2
+
 	DirectionAny     = 0
 	DirectionIngress = 1
 	DirectionEgress  = 2
@@ -28,7 +32,7 @@ type Config struct {
 	MatchDstIP   uint8
 	MatchSrcPort uint8
 	MatchDstPort uint8
-	Reserved     uint8
+	ProtocolMask uint8
 	SrcIP        uint32
 	DstIP        uint32
 	SrcPort      uint16
@@ -51,17 +55,18 @@ func Parse(expr string) (Config, error) {
 	}
 
 	tokens := compact(strings.Fields(expr))
+	protocolMask := uint8(0)
 
 	for i := 0; i < len(tokens); {
 		switch tokens[i] {
 		case "tcp":
-			cfg.IPProto = ProtoTCP
+			protocolMask |= ProtoMaskTCP
 			i++
 		case "udp":
-			cfg.IPProto = ProtoUDP
+			protocolMask |= ProtoMaskUDP
 			i++
 		case "icmp":
-			cfg.IPProto = ProtoICMP
+			protocolMask |= ProtoMaskICMP
 			i++
 		case "ingress":
 			cfg.Direction = DirectionIngress
@@ -136,13 +141,26 @@ func Parse(expr string) (Config, error) {
 		}
 	}
 
+	switch protocolMask {
+	case ProtoMaskICMP:
+		cfg.IPProto = ProtoICMP
+	case ProtoMaskTCP:
+		cfg.IPProto = ProtoTCP
+	case ProtoMaskUDP:
+		cfg.IPProto = ProtoUDP
+	case 0:
+		// No protocol qualifier means any IPv4 protocol.
+	default:
+		cfg.ProtocolMask = protocolMask
+	}
+
 	return cfg, nil
 }
 
 func compact(tokens []string) []string {
 	out := make([]string, 0, len(tokens))
 	for _, token := range tokens {
-		if token == "and" || token == "&&" {
+		if token == "and" || token == "&&" || token == "or" || token == "||" {
 			continue
 		}
 		out = append(out, token)

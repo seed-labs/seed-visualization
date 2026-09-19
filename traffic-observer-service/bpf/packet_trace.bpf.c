@@ -77,7 +77,21 @@ static __always_inline int match_filter(const struct packet_meta *event, __u8 di
         return 0;
     }
 
-    if (filter->ip_proto != FILTER_PROTO_ANY && filter->ip_proto != event->ip_proto) {
+    if (filter->protocol_mask) {
+        __u8 packet_protocol_mask = 0;
+
+        if (event->ip_proto == FILTER_PROTO_ICMP) {
+            packet_protocol_mask = FILTER_PROTO_MASK_ICMP;
+        } else if (event->ip_proto == FILTER_PROTO_TCP) {
+            packet_protocol_mask = FILTER_PROTO_MASK_TCP;
+        } else if (event->ip_proto == FILTER_PROTO_UDP) {
+            packet_protocol_mask = FILTER_PROTO_MASK_UDP;
+        }
+
+        if (!(filter->protocol_mask & packet_protocol_mask)) {
+            return 0;
+        }
+    } else if (filter->ip_proto != FILTER_PROTO_ANY && filter->ip_proto != event->ip_proto) {
         return 0;
     }
 

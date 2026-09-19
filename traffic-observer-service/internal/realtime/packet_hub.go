@@ -2,8 +2,11 @@ package realtime
 
 import (
 	"context"
+	"errors"
 	"log"
+	"net"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -215,10 +218,25 @@ func (c *packetClient) writeLoop() {
 	for message := range c.send {
 		_ = c.conn.SetWriteDeadline(time.Now().Add(2 * time.Second))
 		if err := c.conn.WriteJSON(message); err != nil {
-			log.Printf("write packet websocket failed: %v", err)
+			if !isExpectedWebSocketDisconnect(err) {
+				log.Printf("write packet websocket failed: %v", err)
+			}
 			return
 		}
 	}
+}
+
+func isExpectedWebSocketDisconnect(err error) bool {
+	if errors.Is(err, net.ErrClosed) || errors.Is(err, websocket.ErrCloseSent) {
+		return true
+	}
+	if websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway, websocket.CloseNoStatusReceived) {
+		return true
+	}
+	message := strings.ToLower(err.Error())
+	return strings.Contains(message, "broken pipe") ||
+		strings.Contains(message, "closed network connection") ||
+		strings.Contains(message, "connection reset by peer")
 }
 
 func (c *packetClient) close() {

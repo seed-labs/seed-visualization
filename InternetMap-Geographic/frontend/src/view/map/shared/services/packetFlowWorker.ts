@@ -12,7 +12,12 @@ type AnalyzeRequest = {
   options?: PacketFlowAnalysisOptions
 }
 
-type WorkerRequest = AnalyzeRequest
+type SetTopologyRequest = {
+  type: 'set-topology'
+  edges: Array<{ from: string; to: string }>
+}
+
+type WorkerRequest = AnalyzeRequest | SetTopologyRequest
 
 type WorkerResolved = {
   id: number
@@ -34,6 +39,8 @@ type WorkerFailure = {
 
 export type PacketFlowWorkerResponse = WorkerResolved | WorkerUnresolved | WorkerFailure
 
+let topologyEdges: Array<{ from: string; to: string }> = []
+
 function handleAnalyze(request: AnalyzeRequest): PacketFlowWorkerResponse {
   if (!request.events.length) {
     return {
@@ -43,7 +50,10 @@ function handleAnalyze(request: AnalyzeRequest): PacketFlowWorkerResponse {
     }
   }
 
-  const analysis = analyzePacketFlow(request.events, request.options)
+  const analysis = analyzePacketFlow(request.events, {
+    ...request.options,
+    topologyEdges: request.options?.topologyEdges ?? topologyEdges,
+  })
   if (analysis.pathSteps.length === 0 || analysis.pathSegments.length === 0) {
     return {
       id: request.id,
@@ -61,6 +71,10 @@ function handleAnalyze(request: AnalyzeRequest): PacketFlowWorkerResponse {
 
 self.onmessage = (event: MessageEvent<WorkerRequest>) => {
   const request = event.data
+  if (request.type === 'set-topology') {
+    topologyEdges = request.edges
+    return
+  }
   try {
     postMessage(handleAnalyze(request))
   } catch (error) {

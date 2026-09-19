@@ -4,6 +4,7 @@ import type {
 } from './packetFlowAnalyzer'
 import type { EmulatorTopologyPacketReplayEvent } from './packetReplayFileService'
 import type { PacketFlowWorkerResponse } from './packetFlowWorker'
+import { isProxy, toRaw } from 'vue'
 
 export type PacketFlowWorkerAnalysisResult =
   | {
@@ -23,6 +24,7 @@ type PendingRequest = {
 export class PacketFlowWorkerClient {
   private nextId = 1
   private worker?: Worker
+  private topologyEdges?: Array<{ from: string; to: string }>
   private readonly pending = new Map<number, PendingRequest>()
 
   analyze(
@@ -40,23 +42,43 @@ export class PacketFlowWorkerClient {
     const id = this.nextId
     this.nextId += 1
     const worker = this.ensureWorker()
+    const topologyEdges = options.topologyEdges
+    const shouldUpdateTopology = Boolean(topologyEdges && topologyEdges !== this.topologyEdges)
+    const workerEvents = events.map((event) => ({ ...(isProxy(event) ? toRaw(event) : event) }))
+    const workerTopologyEdges = shouldUpdateTopology
+      ? topologyEdges!.map((edge) => ({ ...(isProxy(edge) ? toRaw(edge) : edge) }))
+      : undefined
+    const requestOptions = { ...options, topologyEdges: undefined }
 
     return new Promise<PacketFlowWorkerAnalysisResult>((resolve) => {
       const timeoutId = window.setTimeout(() => {
         this.pending.delete(id)
         resolve({
           status: 'unresolved',
-          reason: `Packet flow analysis timed out after ${timeoutMs} ms.`,
+          reason: `Packet flow analysis timed out`,
         })
       }, timeoutMs)
 
       this.pending.set(id, { resolve, timeoutId })
-      worker.postMessage({
-        id,
-        type: 'analyze',
-        events: toWorkerPlainData(events),
-        options,
-      })
+      try {
+        if (workerTopologyEdges) {
+          this.topologyEdges = topologyEdges
+          worker.postMessage({ type: 'set-topology', edges: workerTopologyEdges })
+        }
+        worker.postMessage({
+          id,
+          type: 'analyze',
+          events: workerEvents,
+          options: requestOptions,
+        })
+      } catch (error) {
+        window.clearTimeout(timeoutId)
+        this.pending.delete(id)
+        resolve({
+          status: 'unresolved',
+          reason: error instanceof Error ? error.message : String(error),
+        })
+      }
     })
   }
 
@@ -71,6 +93,7 @@ export class PacketFlowWorkerClient {
     this.pending.clear()
     this.worker?.terminate()
     this.worker = undefined
+    this.topologyEdges = undefined
   }
 
   private ensureWorker() {
@@ -88,6 +111,7 @@ export class PacketFlowWorkerClient {
       this.pending.clear()
       this.worker?.terminate()
       this.worker = undefined
+      this.topologyEdges = undefined
     }
     return this.worker
   }
@@ -112,8 +136,4 @@ export class PacketFlowWorkerClient {
       reason: message.type === 'unresolved' ? message.reason : message.error,
     })
   }
-}
-
-function toWorkerPlainData<T>(value: T): T {
-  return JSON.parse(JSON.stringify(value)) as T
 }

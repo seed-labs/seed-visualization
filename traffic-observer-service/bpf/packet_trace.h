@@ -8,6 +8,10 @@
 #define FILTER_PROTO_TCP 6
 #define FILTER_PROTO_UDP 17
 
+#define FILTER_PROTO_MASK_ICMP (1 << 0)
+#define FILTER_PROTO_MASK_TCP (1 << 1)
+#define FILTER_PROTO_MASK_UDP (1 << 2)
+
 #define FILTER_DIRECTION_ANY 0
 #define FILTER_DIRECTION_INGRESS 1
 #define FILTER_DIRECTION_EGRESS 2
@@ -22,7 +26,7 @@ struct filter_config {
     __u8 match_dst_ip;
     __u8 match_src_port;
     __u8 match_dst_port;
-    __u8 reserved;
+    __u8 protocol_mask;
     __u32 src_ip;
     __u32 dst_ip;
     __u16 src_port;

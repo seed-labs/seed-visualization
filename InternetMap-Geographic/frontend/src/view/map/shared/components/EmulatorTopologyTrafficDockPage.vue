@@ -33,6 +33,8 @@
       :seek-position="seekPosition"
       :playback-enabled="playbackEnabled"
       :playback-paused="playbackPaused"
+      :playback-preparing="playbackPreparing"
+      :playback-status-text="playbackStatusText"
       :imported-file-name="importedFileName"
       :import-status-text="importStatusText"
       :import-error="importError"
@@ -64,6 +66,8 @@
       :seek-position="seekPosition"
       :playback-enabled="playbackEnabled"
       :playback-paused="playbackPaused"
+      :playback-preparing="playbackPreparing"
+      :playback-status-text="playbackStatusText"
       @submit-filter="$emit('submitFilter')"
       @toggle-recording="$emit('toggleRecording')"
       @toggle-playback="$emit('togglePlayback')"
@@ -98,6 +102,8 @@ withDefaults(defineProps<{
   seekPosition: number
   playbackEnabled: boolean
   playbackPaused: boolean
+  playbackPreparing?: boolean
+  playbackStatusText?: string
   importedFileName?: string
   importStatusText?: string
   importError?: string

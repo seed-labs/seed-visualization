@@ -3,6 +3,8 @@ package realtime
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"net"
 	"net/http/httptest"
 	"strings"
 	"testing"
@@ -12,6 +14,22 @@ import (
 
 	"github.com/gorilla/websocket"
 )
+
+func TestExpectedWebSocketDisconnectErrors(t *testing.T) {
+	for _, err := range []error{
+		websocket.ErrCloseSent,
+		net.ErrClosed,
+		errors.New("write tcp: broken pipe"),
+		errors.New("use of closed network connection"),
+	} {
+		if !isExpectedWebSocketDisconnect(err) {
+			t.Fatalf("expected disconnect error to be ignored: %v", err)
+		}
+	}
+	if isExpectedWebSocketDisconnect(errors.New("unexpected encoder failure")) {
+		t.Fatal("unexpected write errors must still be logged")
+	}
+}
 
 func TestPacketHubBroadcastsPacketMessages(t *testing.T) {
 	hub := NewPacketHub()

@@ -54,7 +54,6 @@
     depends_on:
       - seedemu_emulator_service
       - seedemu_satellite_emulator_service
-      - seedmu_traffic_observer_service
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:

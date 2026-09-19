@@ -195,7 +195,7 @@ export class TrafficObserverClient {
         const parsed = JSON.parse(event.data as string) as unknown
         if (isPacketMessage(parsed)) {
           const replayEvent = toReplayEvent(parsed)
-          console.log('[traffic observer ws] received packet', parsed.nodeLabel)
+          // console.log('[traffic observer ws] received packet', parsed.nodeLabel)
           this.onPacket(replayEvent)
         }
       } catch (error) {

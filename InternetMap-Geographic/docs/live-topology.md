@@ -64,6 +64,12 @@ Live capture and local recording are separate actions:
 
 Only packets received while recording is enabled are counted in the Packet total and become available for replay.
 
+- Recording stores at most 100,000 packets. Reaching the limit stops recording, returns the Packet axis to the beginning, and shows a warning for 5 seconds.
+- In Timeline mode with a positive time window, recorded packets are split into timestamp batches before playback. Packets in one batch are displayed together, and the Packet axis advances by that batch's actual packet count.
+- The delay between batches is calculated from the current batch's last packet to the next batch's first packet, divided by Timeline speed.
+- When Flow animation requires path analysis, the play button shows a loading state and a prominent calculation message. Enabling Flow animation during active replay pauses scheduling, calculates paths, and then resumes from the current Packet position.
+- If live packet paths repeatedly cannot be resolved, Flow animation is disabled after at least six failures over at least 15 seconds. The warning remains visible for 5 seconds and live packets fall back to node highlights.
+
 ## Node details, Actions, and BGP sessions
 
 When `Hover details` is enabled, hovering over a node displays a details card.

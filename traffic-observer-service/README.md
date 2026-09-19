@@ -86,6 +86,7 @@ all
 tcp
 udp
 icmp
+icmp or tcp or udp
 host 10.0.0.2
 src host 10.0.0.2
 dst host 10.0.0.3

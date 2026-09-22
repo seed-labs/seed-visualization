@@ -36,3 +36,5 @@ bin
 __pycache__
 *.pcap
 traffic-observer-service/pcap/
+*.bin
+badfile

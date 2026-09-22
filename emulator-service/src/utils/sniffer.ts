@@ -4,6 +4,7 @@ import { SessionManager, Session } from './session-manager';
 import { RuntimeClient } from '../runtime/types';
 
 export class Sniffer implements LogProducer {
+    private static readonly DEFAULT_SESSION_CONCURRENCY = 32;
     private _logger: Logger;
     private _listener: (nodeId: string, stdout: any) => void;
     private _capturePacketListener: (nodeId: string) => void;
@@ -29,9 +30,9 @@ export class Sniffer implements LogProducer {
     }
 
     async sniff(nodes: string[], expr: string) {
-        this._logger.debug(`sniffing on ${nodes} with expr ${expr}...`);
+        this._logger.debug(`sniffing on ${nodes.length} nodes with expr ${expr}...`);
 
-        var sessions = await Promise.all(nodes.map(node => this._sessionManager.getSession(node, ['/seedemu_sniffer'])));
+        let sessions = await Promise.all(nodes.map(node => this._sessionManager.getSession(node, ['/seedemu_sniffer'], true)));
 
         sessions.forEach(session => {
             try {

@@ -13,6 +13,11 @@ import (
 
 const DefaultSocketPath = "/var/run/docker.sock"
 
+const (
+	dockerResponseHeaderTimeout = 30 * time.Second
+	dockerMaxConnections        = 128
+)
+
 type Client struct {
 	http *http.Client
 }
@@ -70,15 +75,19 @@ func New(socketPath string) *Client {
 
 	transport := &http.Transport{
 		DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
-			var d net.Dialer
+			d := net.Dialer{Timeout: 5 * time.Second}
 			return d.DialContext(ctx, "unix", socketPath)
 		},
+		ResponseHeaderTimeout: dockerResponseHeaderTimeout,
+		MaxIdleConns:          dockerMaxConnections,
+		MaxIdleConnsPerHost:   dockerMaxConnections,
+		MaxConnsPerHost:       dockerMaxConnections,
+		IdleConnTimeout:       90 * time.Second,
 	}
 
 	return &Client{
 		http: &http.Client{
 			Transport: transport,
-			Timeout:   5 * time.Second,
 		},
 	}
 }

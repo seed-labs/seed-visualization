@@ -211,6 +211,7 @@ The interface mapping is a snapshot of the Docker/emulator topology at the time 
 
 In that situation, refresh the observer in one of these ways:
 
+0. When there are too many nodes (with the number of nodes exceeding 500), it is recommended to restart the container and wait for the API service to start. It will take a relatively long time to request "interfaces".
 1. Restart `traffic-observer-service`.
 2. Preferably, keep the service running and call the runtime refresh API:
 

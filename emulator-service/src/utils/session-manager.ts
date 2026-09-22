@@ -66,6 +66,11 @@ export class SessionManager implements LogProducer {
         return this._sessions[fullId] && this._sessions[fullId].stream.writable;
     }
 
+    getExistingSession(fullId: string): Session | undefined {
+        const session = this._sessions[fullId];
+        return session?.stream.writable ? session : undefined;
+    }
+
     /**
      * listen for events.
      * 
@@ -89,10 +94,10 @@ export class SessionManager implements LogProducer {
      * ['bash']
      * @returns session
      */
-    async getSession(id: string, command: string[] = ['bash']): Promise<Session> {
+    async getSession(id: string, command: string[] = ['bash'], idIsResolved: boolean = false): Promise<Session> {
         this._logger.info(`getting container ${id}...`);
 
-        var fullId = await this._getContainerRealId(id);
+        var fullId = idIsResolved ? id : await this._getContainerRealId(id);
         this._logger.trace(`${id}'s full id: ${fullId}.`)
 
         if (this._sessions[fullId]) {

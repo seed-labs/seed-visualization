@@ -3,7 +3,6 @@ package ifacemanager
 import (
 	"context"
 	"fmt"
-	"log"
 	"strings"
 	"sync"
 
@@ -83,7 +82,6 @@ func (m *Manager) Refresh(ctx context.Context) (Snapshot, error) {
 	snapshot := m.snapshotLocked()
 	m.mu.Unlock()
 
-	log.Printf("traffic interfaces refreshed: interfaces=%s discoveredContainerInterfaces=%d", snapshot.Interfaces, snapshot.DiscoveredContainerInterface)
 	return snapshot, nil
 }
 

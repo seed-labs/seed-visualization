@@ -1,35 +1,33 @@
-# E00_mini_internet 基本功能测试
+# E00_mini_internet Basic Function Test
 
-## 验证目的与范围
+## Purpose and Scope
 
-本示例用于在低流量、固定拓扑下验证页面基本功能，建立后续规模和流量压力测试的正确性基线。覆盖 3D/2D、实时/上传、搜索筛选、录制回放、控制台和面板布局。
+This example verifies basic page behavior with a fixed topology and low traffic, establishing a correctness baseline for later scale and traffic stress tests. It covers 3D/2D, live/upload modes, search and filtering, recording and replay, consoles, and panel layout.
 
-这里记录的是操作步骤和预期结果，不代表已经完成实测。压力上限、长期稳定性和大规模蠕虫传播应在其他示例验证。
+The procedures below describe operations and expected results; they do not claim that a test run has already been completed. Test performance limits, long-term stability, and large worm propagation with other examples.
 
-本例使用同目录的 [mini_internet.py](./mini_internet.py)。默认包含 17 个 AS（5 个 transit AS、12 个 stub AS）、6 个 IX、27 个 router、25 个 host（每个 stub AS 2 个，加上 AS154 的 `host_new`），共 58 个仿真节点容器，其中包括 6 个 IX route-server 容器。可视化等辅助服务不计入此数量。
+The example uses [mini_internet.py](./mini_internet.py). Its default topology contains 17 ASes (5 transit and 12 stub), 6 IXes, 27 routers, and 25 hosts (2 per stub AS plus `host_new` in AS154), for a total of 58 emulated node containers including 6 IX route-server containers. Supporting visualization services are not included in this count.
 
-地图上的 **star 是 IX 的 peering 网络，不是容器**。每个 star 有对应的真实 IX route-server 容器；两者分别设置坐标，便于在地图上区分。router 和 host 使用周边地区的城市坐标，布局用于功能展示，不代表真实 AS 的物理部署。
+The map **star represents an IX peering network, not a container**. Each star has a corresponding real IX route-server container. They use separate coordinates so they remain distinguishable. Routers and hosts use nearby city coordinates for demonstration and do not represent the physical deployment of a real AS.
 
-## 1. 环境准备与启动
+## 1. Environment and Startup
 
-在安装了 SEED Emulator Python 库、Docker Engine 和 Docker Compose v2 的 Linux 仿真主机执行。首次构建需要能够获取基础镜像及软件包。实时抓包还需要满足 traffic-observer-service 的 Linux 内核与特权容器要求。
+Run on a Linux emulation host with the SEED Emulator Python package, Docker Engine, and Docker Compose v2. The first build must be able to retrieve base images and packages. Live capture also requires the Linux kernel and privileged-container configuration described by `traffic-observer-service`.
 
-### 1.1 生成拓扑
+### 1.1 Generate the topology
 
-从仓库根目录执行：
+From the repository root:
 
 ```bash
 cd InternetMap-Geographic/examples/E00_mini_internet
 python mini_internet.py
 ```
 
-默认生成 AMD64 配置；ARM64 主机使用 `python mini_internet.py --platform arm`。默认输出位于本例的 `output/`，包含 `docker-compose.yml`。脚本默认覆盖输出目录，已有实验需要先保存生成文件和记录；使用 `--no-override` 可禁止覆盖。
+The default platform is AMD64. Use `python mini_internet.py --platform arm` on ARM64. Output is written to `output/` and includes `docker-compose.yml`. The generator overwrites the output directory by default, so preserve existing experiment files first; use `--no-override` to forbid replacement.
 
-基本功能测试建议保持默认 `--hosts-per-as 2`。可通过 `--output <目录>` 更改输出路径。`--dumpfile` 只保存模拟器对象，不生成 Compose；本流程应执行完整渲染，不使用 `--skip-render`。
+Keep the default `--hosts-per-as 2` for the basic test. Use `--output <directory>` to change the output path. `--dumpfile` only saves the emulator object and does not generate Compose output; this procedure requires a complete render and must not use `--skip-render`.
 
-### 1.2 构建并启动仿真容器
-
-继续在上述目录执行：
+### 1.2 Build and start the emulation containers
 
 ```bash
 cd output
@@ -38,138 +36,136 @@ docker compose up -d
 docker compose ps
 ```
 
-预期：用于实验的主机和路由器容器处于运行状态。等待路由收敛后再开始通信验证；若构建失败，先处理镜像、SEED Emulator 版本或基础服务问题。
+Expected result: experiment host and router containers are running. Wait for routing convergence before testing communication. Resolve image, SEED Emulator version, or base-service errors before continuing if the build fails.
 
-### 1.3 启动可视化和采集服务
+### 1.3 Start visualization and capture services
 
-另开终端，回到仓库根目录执行：
+In another terminal, return to the repository root:
 
 ```bash
 docker compose up -d --build seedemu_emulator_service seedemu_internet_map_geographic seedmu_traffic_observer_service
 ```
 
-实时拓扑的 Docker API 与抓包服务应观察同一套仿真容器。默认 Compose 使用本机 Docker socket，建议在同一台 Linux 主机运行。本次验收统一访问 8090；若所用 SEED Emulator 版本默认生成了占用 8080 端口的内置地图服务，注意避免端口冲突。
+The live-topology Docker API and packet-capture service must observe the same emulation containers. The default Compose deployment uses the local Docker socket, so run it on the same Linux host. These tests use port 8090. Avoid a port conflict if the installed SEED Emulator version also generates a built-in map service.
 
-| 模式 | 访问地址 |
+| Mode | URL |
 | --- | --- |
-| 实时 3D | `http://<ip>:8090/pro/map/3d` |
-| 实时 2D | `http://<ip>:8090/pro/map/2d` |
-| 上传 3D | `http://<ip>:8090/pro/upload/3d` |
-| 上传 2D | `http://<ip>:8090/pro/upload/2d` |
+| Live 3D | `http://<ip>:8090/pro/map/3d` |
+| Live 2D | `http://<ip>:8090/pro/map/2d` |
+| Upload 3D | `http://<ip>:8090/pro/upload/3d` |
+| Upload 2D | `http://<ip>:8090/pro/upload/2d` |
 
-`<ip>` 为可视化服务主机 IP。浏览器在另一台机器上时，上传前需将本例生成的 `output/docker-compose.yml` 复制到浏览器所在机器。
+`<ip>` is the visualization host. If the browser runs on another computer, copy `output/docker-compose.yml` to that computer before testing upload mode.
 
-## 2. 固定验证数据
+## 2. Fixed Validation Data
 
-1. 从实时页面选择两台不同 AS 的运行中主机，记作 A、B。
-2. 记录 A 的容器名称、A/B 的 IP、所属 AS，以及预期经过的路由器或 IX。
-3. 选择一个实际存在的 IX 和一台路由器，用于筛选和详情验证。
-4. 初始状态恢复为未选择 AS/IX、搜索为空；记录节点类型开关、标签开关及显示的节点/链路数量。
+1. Select two running hosts in different ASes on the live page and call them A and B.
+2. Record A's container name, the A/B addresses, their ASes, and the expected routers or IXes on the path.
+3. Select one real IX and one router for filter and detail checks.
+4. Restore the initial state: no selected AS/IX and an empty search. Record node-type visibility, label settings, and node/link counts.
 
-建议选择 AS150 与 AS171 的 host 作为 A、B，以覆盖跨 IX 通信。不要写死宿主机 IP 或假定主机地址。可在 `output` 中运行 `docker compose ps` 查找容器，在页面详情或容器中确认 IP。
+AS150 and AS171 hosts are good A/B candidates because their traffic crosses an IX. Do not hard-code host addresses. Use `docker compose ps` in `output`, page details, or commands inside containers to obtain actual values.
 
-### 2.1 地理位置基线
+### 2.1 Geographic baseline
 
-各网络和容器通过 `org.seedsecuritylabs.seedemu.meta.geo.lat`、`org.seedsecuritylabs.seedemu.meta.geo.lon` 标签提供六位小数的经纬度。star 与 IX 容器的位置如下：
+Networks and containers provide six-decimal coordinates through `org.seedsecuritylabs.seedemu.meta.geo.lat` and `org.seedsecuritylabs.seedemu.meta.geo.lon`.
 
-| IX | star 所在城市 | IX 容器展示城市 | 两者约距 |
+| IX | Star city | IX container display city | Approximate distance |
+| --- | --- | --- | ---: |
+| 100 | New York | Philadelphia | 130 km |
+| 101 | San Jose | Santa Rosa | 142 km |
+| 102 | Chicago | Rockford | 129 km |
+| 103 | Miami | West Palm Beach | 107 km |
+| 104 | Boston | Worcester | 62 km |
+| 105 | Houston | Huntsville, Texas | 108 km |
+
+Routers are approximately 78–976 km from their star, and hosts are approximately 67–270 km from their router. Coordinates use non-desert land cities and avoid oceans and polar regions. The six stars and 58 default container coordinates do not overlap; icons can still overlap on screen depending on zoom and icon size.
+
+Each stub AS defines three host cities and reuses coordinates after those are exhausted. AS154's `host_new` also occupies one position. Therefore configurations with a larger `--hosts-per-as` value are not required to keep all host coordinates unique.
+
+After changing coordinates, regenerate Compose and update the live containers or parse the new file again in upload mode.
+
+## 3. Topology and Page Functions
+
+Run these cases in live 3D and live 2D. After parsing the file on upload pages, repeat the static-topology, search, filtering, and layout checks.
+
+| ID | Purpose | Procedure | Expected result / pass criteria |
 | --- | --- | --- | --- |
-| 100 | 纽约 | 费城 | 130 km |
-| 101 | 圣何塞 | 圣罗莎 | 142 km |
-| 102 | 芝加哥 | 罗克福德 | 129 km |
-| 103 | 迈阿密 | 西棕榈滩 | 107 km |
-| 104 | 波士顿 | 伍斯特 | 62 km |
-| 105 | 休斯敦 | 亨茨维尔（得克萨斯州） | 108 km |
+| B01 | Live topology load | Open the live page, wait for loading, inspect Overview, and refresh | Map, nodes, links, and panel appear; loading mask disappears; A/B are searchable; refresh does not duplicate nodes |
+| B02 | 3D/2D consistency | Open both modes with identical filters and visibility settings | Both work; node identity and topology relationships match for the same snapshot; layouts may differ |
+| B03 | Map interaction | Zoom and drag; rotate in 3D; click and hover over nodes | Map responds, details match the target, and panel controls remain usable |
+| B04 | Upload topology | Select the generated Compose file, click **Parse file**, and check 3D/2D | Topology appears; known A/B, AS, and IX objects are recognized; offline details do not offer real-container operations |
+| B05 | Search | Search by A's name, IP, and AS; select a suggestion or submit; clear afterward | Matching node is selected/highlighted; a unique result can be located; unrelated nodes remain unselected; clearing restores state |
+| B06 | AS/IX filter | Test single selection, multiple selection, and clearing in Overview | Matching nodes and relationships appear; clearing restores the topology; clear the other filter before testing one in isolation |
+| B07 | Types and labels | Toggle Host, Router, Network, IX, labels, and Hover details; adjust scales | Visibility and details follow settings; disabling Router constrains Network; disabling Network hides links; restoring shows them again |
+| B08 | Panel layout | Switch Overview, Settings, and Traffic Replay; minimize/expand; test several viewport sizes | Active content is correct, controls remain clickable, edges are not clipped, and long content is scrollable |
+| B22 | Star and IX distinction | Inspect every star and matching IX container | Star represents the IX network; IX container has a separate identity and coordinate; topology remains connected correctly |
+| B23 | Geographic grouping | Inspect IXes, routers, hosts, and AS154 `host_new` at regional/city zoom | Nodes are on configured land cities; routers group around stars and hosts around routers; default coordinates do not overlap |
+| B24 | Live/upload coordinate consistency | Compare the same objects from one generated and deployed Compose file | Identical objects use identical coordinates; IX-container offset applies to both sources; refresh/reparse does not randomize placement |
 
-router 距所属 star 约 78–976 km，host 距所属 router 约 67–270 km。预设位置选择非沙漠地区的陆地城市，避开海洋和极地。默认 6 个 star 与 58 个容器坐标互不重合；屏幕上的图标是否遮挡还取决于缩放级别和图标大小。
+Live pages read running containers while upload pages read Compose definitions. Differences caused by services that are not running or visibility settings must be explained by node identity and input data instead of treating any count difference as a failure.
 
-每个 stub AS 预设 3 个 host 城市，超出后会复用坐标；AS154 的 `host_new` 也占用一个位置。因此增加 `--hosts-per-as` 后不再要求全部 host 坐标互不重合。
+## 4. Live Traffic and Recording
 
-修改脚本坐标后，需要重新生成 Compose，并在实时模式更新对应容器，或在上传模式重新解析新文件，才能验证新布局。
+### 4.1 Generate verifiable low-rate ICMP traffic
 
-## 3. 拓扑与页面功能
-
-以下用例分别在实时 3D、实时 2D 执行；上传页面完成文件解析后，重复静态拓扑、搜索、筛选和布局检查。
-
-| 编号 | 验证目的 | 操作步骤 | 预期效果 / 通过标准 |
-| --- | --- | --- | --- |
-| B01 | 实时拓扑加载 | 打开实时页面，等待加载完成，查看 Overview；点击刷新 | 地图、节点、链路和右下角面板可见；加载遮罩消失；已知 A/B 可查到；刷新不重复增加节点 |
-| B02 | 3D/2D 一致性 | 分别打开两种模式，恢复相同筛选和显示设置 | 两种模式均可用；同一数据快照下节点身份和拓扑关系一致；不要求坐标布局完全相同 |
-| B03 | 地图交互 | 缩放、拖动；3D 下旋转地球；点击和悬停节点 | 地图响应操作，详情对应目标节点，面板仍可操作 |
-| B04 | 上传拓扑 | 打开上传页面，选择本例生成的 Compose 文件，点击 Parse file；分别检查 3D/2D | 解析后显示拓扑；已知 A/B、AS、IX 可识别；离线详情不提供真实容器操作 |
-| B05 | 搜索 | 使用 A 的名称、IP、AS 搜索；选择建议、按 Enter 或点击搜索；随后清空 | 对应节点被匹配或高亮；唯一匹配时可定位；无结果关键词不会选中无关节点；清空后状态恢复 |
-| B06 | AS/IX 筛选 | 在 Overview 打开 AS/IX 选择器，分别测试单选、多选和清空 | 展示符合条件的节点及关系；清空后恢复；测试单一筛选时先清除另一项筛选 |
-| B07 | 类型与标签 | 在 Settings 切换 Host、Router、Network、IX、标签和 Hover details，调整大小 | 可见性和详情随设置变化；关闭 Router 时 Network 受依赖限制；关闭 Network 时链路隐藏，恢复后可重新显示 |
-| B08 | 面板布局 | 切换 Overview、Settings、Traffic Replay；最小化再展开；检查 1920×1080、1366×768 和较小窗口 | 当前页签内容正确，按钮可点击；面板边缘未被裁切，较长内容可滚动访问 |
-| B22 | star 与 IX 容器区分 | 开启相关节点和网络显示，逐个检查 6 个 star 及对应 IX 容器；放大并查看详情 | star 表示 IX 网络，IX 容器具有独立身份；位置符合 2.1 节，二者不共用坐标；拓扑连接保持正确 |
-| B23 | 地理位置与分组 | 检查各 IX、router、host（含 AS154 的 `host_new`），缩放到地区和城市级别 | 节点落在预设陆地城市，不在海洋、沙漠或极地；router 与所属 star、host 与所属 router 的关联正确；默认配置坐标不重合 |
-| B24 | 实时与上传坐标一致性 | 使用同一次生成且已部署的 Compose，分别查看实时和上传页面中的相同网络、容器 | 相同对象使用相同经纬度；IX 容器的展示偏移在两种数据来源下均生效；刷新或重新解析不随机改变位置 |
-
-实时页面读取运行中的容器，上传页面读取 Compose 定义。若存在未启动服务或显示开关不同，不能仅凭两者总数不同判失败，应按节点身份和输入数据解释差异。
-
-## 4. 实时流量与录制
-
-### 4.1 产生可核对的低速 ICMP 流量
-
-在实时页面 Traffic Replay 中提交过滤器，先将 `<B_IP>` 替换为 B 的真实地址：
+Submit this filter in Traffic Replay after replacing `<B_IP>`:
 
 ```text
 icmp and host <B_IP>
 ```
 
-打开录制，再从仿真主机执行以下命令，将两个占位符替换为实际值：
+Enable recording and run:
 
 ```bash
 docker exec <A_CONTAINER> ping -c 20 -i 1 <B_IP>
 ```
 
-预期：ping 能收到应答，页面收到相关流量事件，并出现相关节点闪烁或流动动画。若 ping 本身不通，先排查仿真网络，不能直接认定页面失败。
+Expected result: ping receives replies, the page receives matching traffic events, and relevant nodes flash or display flow animation. If ping itself fails, diagnose the emulated network before treating it as a page failure.
 
-| 编号 | 验证目的 | 操作步骤 | 预期效果 / 通过标准 |
+| ID | Purpose | Procedure | Expected result / pass criteria |
 | --- | --- | --- | --- |
-| B09 | 流量过滤 | 使用上述过滤器发包；再改为 `icmp and dst host <B_IP>` 重复发送 | 页面只处理匹配流量；第二种过滤器排除从 B 返回的应答方向；页面路径与已知通信端点一致 |
-| B10 | 动画显示 | 发包期间分别开关 Flow animation、Packet path links only | 显示随开关变化；仅路径链路模式不显示无关拓扑链路；尚未解析出路径时允许没有路径链路，不应虚构连接 |
-| B11 | 开始/停止录制 | 录制开启时发送一批包，停止录制后再发送一批 | 录制开启时事件积累；停止录制后不再追加新记录；仍开启采集时实时动画可继续 |
-| B12 | 停止采集 | 提交空 filter，再发送少量包 | 采集状态停止；在途事件处理完后不再持续产生新事件或新动画 |
+| B09 | Traffic filtering | Send with the filter above, then repeat with `icmp and dst host <B_IP>` | Only matching traffic is processed; the second filter excludes B's reply direction; path matches known endpoints |
+| B10 | Animation | Toggle Flow animation and Packet path links only while sending | Display follows the toggles; path-only mode hides unrelated links; unresolved paths remain absent instead of inventing links |
+| B11 | Start/stop recording | Send one batch while recording, stop recording, then send another | Events accumulate only while recording; live animation may continue while capture remains enabled |
+| B12 | Stop capture | Submit an empty filter and send a few packets | Capture stops; after in-flight work completes, no new event or animation continues indefinitely |
 
-一次 ping 会产生请求和应答，同一个包也可能在多个节点被观测。因此不能把“20 次 ping”直接当作“20 条录制事件”。应记录发送包数、过滤器、录制事件数，并核对端点与方向。
+One ping produces a request and reply, and one packet can be observed at several nodes. Do not equate 20 ping requests with 20 recorded events. Record sent packets, filter, recorded count, endpoints, and directions.
 
-## 5. 回放验证
+## 5. Replay Validation
 
-先停止发包和录制，保留刚才获得的有限事件集，避免新增流量影响结果。分别在实时 3D 和实时 2D 获取记录并执行本节，不假定页面切换会自动共享记录。
+Stop sending and recording while keeping the small recorded set. Run these tests independently in live 3D and live 2D.
 
-| 编号 | 验证目的 | 操作步骤 | 预期效果 / 通过标准 |
+| ID | Purpose | Procedure | Expected result / pass criteria |
 | --- | --- | --- | --- |
-| B13 | 固定间隔回放 | 选择 Interval，设置 Event interval 为 1000ms，开始播放 | 事件按记录顺序推进；路径端点正确；进度持续变化 |
-| B14 | 时间线回放 | 选择 Timeline，分别使用 1 倍、2 倍速度播放同一记录 | 保留事件时间关系；2 倍速度整体推进更快，不要求逐帧精确计时 |
-| B15 | 暂停与恢复 | 播放中暂停，观察进度，再继续 | 暂停后进度不继续推进；恢复后从当前位置继续；已触发动画可以完成收尾 |
-| B16 | 跳转与边界 | 向前/后跳转，移动到开头、结尾，连续调整进度 | 目标位置与所选事件一致；不会继续展示旧位置积压的大量动画；结束状态正确 |
-| B17 | 清空与再次录制 | 停止播放并清空；再开启采集和录制，重新发包 | 事件列表和回放进度重置；新一轮记录可正常播放，不混入旧记录 |
+| B13 | Interval replay | Choose Interval, set Event interval to 1000 ms, and play | Events advance in recorded order, endpoints are correct, and progress continues |
+| B14 | Timeline replay | Play the same record at 1× and 2× | Event timing relationships are retained; 2× advances faster overall |
+| B15 | Pause/resume | Pause during playback, observe progress, then resume | Progress stops while paused and resumes from the same position; already-started animations may finish |
+| B16 | Seek/boundaries | Seek backward/forward and move to the beginning and end | Selected event matches position; stale queued animation is cleared; ending state is correct |
+| B17 | Clear and record again | Stop, clear, enable capture/recording, and send again | Event list and progress reset; new replay contains no old events |
 
-上传页面的离线流量回放需要额外准备与该拓扑对应的 collector JSON；匹配的 PCAP 可选。本例目录不预置这两种流量文件。具备文件时，在上传页面 Traffic Replay 导入并重复 B13–B17 中适用的播放、跳转和清空操作；JSON 单独导入时过滤输入应禁用，JSON+PCAP 时再验证离线过滤。未准备文件时标记为“未执行”，不能计入已通过。
+Upload-mode offline replay needs collector JSON matching this topology; matching PCAP is optional. This example does not bundle either file. If files are available, import them and repeat applicable B13–B17 checks. Mark the case “not run” when files are unavailable.
 
-## 6. 控制台与任务栏布局
+## 6. Console and Taskbar Layout
 
-仅在实时页面验证，打开 Hover details，从 A 的详情 Actions 启动控制台。
+Test only on live pages. Enable Hover details and start a console from node A's Actions.
 
-| 编号 | 操作步骤 | 预期效果 / 通过标准 |
+| ID | Procedure | Expected result / pass criteria |
 | --- | --- | --- |
-| B18 | 在控制台执行 `hostname`、`ip addr` | 命令响应，容器身份与选中节点一致 |
-| B19 | 拖动、缩放、最小化、从任务栏恢复，再打开 B 的控制台 | 窗口可操作，任务栏切换到正确容器，两个会话不串联 |
-| B20 | 保持任务栏显示，切换右下角三个页签，并缩小浏览器窗口 | tab 框下边缘和底部操作区域不被 `globe-console-taskbar` 遮挡；面板最小化、展开后仍正常 |
-| B21 | 关闭所有控制台 | 任务栏隐藏，页面其他交互保持可用 |
+| B18 | Run `hostname` and `ip addr` | Commands respond and container identity matches the selected node |
+| B19 | Drag, resize, minimize, restore, and open B's console | Windows remain usable, taskbar selects the correct container, and sessions do not mix |
+| B20 | Keep taskbar visible, switch all panel tabs, and shrink the viewport | Panel bottom edge and actions are not covered by `globe-console-taskbar`; minimize/expand still works |
+| B21 | Close all consoles | Taskbar hides and other page interactions remain usable |
 
+## 7. Cleanup
 
-## 7. 清理环境
-
-先停止采集和回放，关闭控制台。进入本例生成目录执行：
+Stop capture and replay and close consoles. Then run:
 
 ```bash
-# 从仓库根目录进入
 cd InternetMap-Geographic/examples/E00_mini_internet/output
 docker compose down
 ```
 
-此命令清理本例仿真容器和网络，不等同于关闭仓库根目录的可视化服务。按需另行处理可视化服务，清理前保存测试记录。
+This removes this example's containers and networks but does not stop repository-level visualization services. Save test records before any additional cleanup.
 
-更多功能说明：[面板与回放](../../docs/topology-dock.md)、[上传拓扑](../../docs/upload-topology.md)、[部署配置](../../docs/deployment.md)。
+Additional documentation: [Panel and replay](../../docs/topology-dock.md), [Upload topology](../../docs/upload-topology.md), and [Deployment](../../docs/deployment.md).

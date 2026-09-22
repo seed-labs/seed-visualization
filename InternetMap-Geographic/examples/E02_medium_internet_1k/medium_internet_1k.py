@@ -80,37 +80,37 @@ def get_assignment(asn,assignment=assignment):
     return assignment
 def update_topology_from_file(TOPOLOGY_DATA,max_new_asns=100):
     """
-    从文件中读取数据更新拓扑
-    :param max_new_asns: 允许新增的最大 AS 数量
+    Update the topology with data read from a file.
+    :param max_new_asns: Maximum number of ASes that may be added.
     """
     
     db_filename = '201603modified.txt'
     
-    print(f"正在分析未使用的 IXP... (最大新增 AS 限制: {max_new_asns})")
+    print(f"Analyzing unused IXPs... (maximum new ASes: {max_new_asns})")
 
-    # 2. 找出不存在于 as_as_ix_edges 中的 IXP
-    # as_as_ix_edges 结构: [(as1, as2, ixp, rel), ...] -> ixp 是第3个元素 (index 2)
+    # 2. Find IXPs that do not appear in as_as_ix_edges.
+    # as_as_ix_edges structure: [(as1, as2, ixp, rel), ...]; ixp is at index 2.
     used_ixps = set(edge[2] for edge in TOPOLOGY_DATA['as_as_ix_edges'])
-    # 筛选未使用的 IXP
+    # Select unused IXPs.
     unused_ixps = [ixp for ixp in TOPOLOGY_DATA['ixps'] if ixp not in used_ixps]
     
     if not unused_ixps:
-        print("未发现未使用的 IXP，无需更新。")
+        print("No unused IXP was found; no update is required.")
         return TOPOLOGY_DATA
 
-    # 3. 寻找未使用的 IXP 连接的 Transit AS (即变量 a)
-    # 建立映射: { Transit_AS_a: [IXP_1, IXP_2, ...] }
-    # 这样读取文件时，如果遇到 AS0 == Transit_AS_a，就可以只检查对应的几个 IXP
+    # 3. Find the transit AS connected to each unused IXP (variable a).
+    # Build a mapping: {Transit_AS_a: [IXP_1, IXP_2, ...]}.
+    # When AS0 == Transit_AS_a, only the corresponding IXPs need to be checked.
     as_to_target_ixps = {}
     
     count_mapped = 0
     for ixp in unused_ixps:
         connected_as = None
-        # ix_ix_transit_edges 结构: [(ixp1, ixp2, as, 0)]
+        # ix_ix_transit_edges structure: [(ixp1, ixp2, as, 0)].
         for edge in TOPOLOGY_DATA['ix_ix_transit_edges']:
             ixp1, ixp2, asn, _ = edge
             if ixp == ixp1 or ixp == ixp2:
-                # 修改点 1: 确保 asn 转换为整数
+                # Convert the ASN to an integer.
                 connected_as = int(asn)
                 break
         
@@ -120,26 +120,26 @@ def update_topology_from_file(TOPOLOGY_DATA,max_new_asns=100):
             as_to_target_ixps[connected_as].append(ixp)
             count_mapped += 1
     
-    print(f"找到 {len(unused_ixps)} 个未使用 IXP，其中 {count_mapped} 个成功关联到 Transit AS。")
-    print("正在扫描 201603modified.txt 进行匹配...")
+    print(f"Found {len(unused_ixps)} unused IXPs; {count_mapped} were mapped to transit ASes.")
+    print("Scanning 201603modified.txt for matches...")
 
-    # 4. 扫描文件并查找匹配项 (a|X|ixp,-1)
-    # 缓存已存在的 Stub AS 以避免重复添加检查
+    # 4. Scan the file for entries matching (a|X|ixp,-1).
+    # Cache existing stub ASes to avoid repeated membership checks.
     existing_stubs = set(TOPOLOGY_DATA['stub_asns'])
     existing_transits = set(TOPOLOGY_DATA['transit_asns'])
     
     new_edges_count = 0
-    added_asns_count = 0 # 修改点 2: 新增 AS 计数器
+    added_asns_count = 0  # Number of newly added ASes.
 
     with open(db_filename, 'r', encoding='utf-8') as f:
         for line in f:
-            # 修改点 3: 检查是否达到数量限制
+            # Stop after reaching the configured limit.
             if added_asns_count >= max_new_asns:
-                print(f"已达到最大新增 AS 数量限制 ({max_new_asns})，停止处理。")
+                print(f"Reached the maximum number of new ASes ({max_new_asns}); stopping.")
                 break
 
             line = line.strip()
-            # 过滤空行和注释
+            # Ignore blank lines and comments.
             if not line or line.startswith('#'):
                 continue
             
@@ -147,30 +147,30 @@ def update_topology_from_file(TOPOLOGY_DATA,max_new_asns=100):
             if len(parts) < 3:
                 continue
             
-            # 获取 AS0 (即变量 a)
+            # Read AS0 (variable a).
             try:
                 as0 = int(parts[0])
             except ValueError:
-                continue # 如果 AS 不是数字则跳过
+                continue  # Skip nonnumeric AS values.
             
-            # 如果这一行的 AS0 是我们要找的 Transit AS 之一
+            # Process rows whose AS0 is one of the target transit ASes.
             if as0 in as_to_target_ixps:
                 target_ixps = as_to_target_ixps[as0]
                 
-                # 获取该行剩余部分 (loc,source...)
-                # parts[0]是AS0, parts[1]是AS1 (即变量 X), parts[2:]是位置信息
+                # Read the remainder of the row (loc, source, ...).
+                # parts[0] is AS0, parts[1] is AS1 (variable X), and parts[2:] contains location data.
                 try:
-                    as1 = int(parts[1]) # 变量 X
+                    as1 = int(parts[1])  # Variable X.
                 except ValueError:
                     continue
 
-                # 遍历该 AS 关心的所有未使用 IXP
+                # Check every unused IXP associated with this AS.
                 for ixp in target_ixps:
-                    # 构造搜索字符串: "ixp,-1"
-                    # 注意：确保 ixp 转为字符串与文件内容匹配
+                    # Construct the search value "ixp,-1".
+                    # Convert the IXP to a string so it matches the file content.
                     search_target = f"{ixp},-1"
                     
-                    # 在剩余部分寻找匹配
+                    # Search the remaining fields for a match.
                     is_match = False
                     for segment in parts[2:]:
                         if search_target in segment:
@@ -178,47 +178,47 @@ def update_topology_from_file(TOPOLOGY_DATA,max_new_asns=100):
                             break
                     
                     if is_match:
-                        # 5. 匹配成功，执行添加操作
+                        # 5. Add the matching relationship.
                         
-                        # 检查是否为新 AS
+                        # Determine whether this is a new AS.
                         is_new_as = as1 not in existing_stubs and as1 not in existing_transits
 
                         if is_new_as:
-                            # 再次检查限制 (以防同一行触发多次添加，虽然这里同一行是同一个AS1)
+                            # Recheck the limit in case one row triggers multiple additions.
                             if added_asns_count >= max_new_asns:
-                                break # 跳出内层循环，外层循环会在下一次迭代时捕获并break
+                                break  # Leave the inner loop; the outer loop checks the limit next.
 
                             TOPOLOGY_DATA['stub_asns'].append(str(as1))
-                            existing_stubs.add(as1) # 更新缓存
+                            existing_stubs.add(as1)  # Update the cache.
                             added_asns_count += 1
                         
-                            # 添加边 (a, X, ixp, -1) -> (as0, as1, ixp, -1)
+                            # Add edge (a, X, ixp, -1) as (as0, as1, ixp, -1).
                             new_edge = (str(as0), str(as1), ixp, '-1')
-                            # 简单去重检查
+                            # Avoid duplicate edges.
                             if new_edge not in TOPOLOGY_DATA['as_as_ix_edges']:
                                 TOPOLOGY_DATA['as_as_ix_edges'].append(new_edge)
                                 new_edges_count += 1
-                                # print(f"添加边: {new_edge}") 
+                                # print(f"Added edge: {new_edge}")
                 
-                # 如果在内层循环触发了限制，外层也需要退出
+                # Leave the outer loop if the inner loop reached the limit.
                 if added_asns_count >= max_new_asns:
                     break
     
-    print(f"处理完成。新增了 {added_asns_count} 个 AS，{new_edges_count} 条 AS-AS-IX 边。")
+    print(f"Processing complete: added {added_asns_count} ASes and {new_edges_count} AS-AS-IX edges.")
     return TOPOLOGY_DATA
 
 def generate_connected_pairs(nodes, extra_edges_count=0):
     """
-    生成随机连接对，确保图是连通的。
-    :param nodes: 节点列表
-    :param extra_edges_count: 在保证连通后，额外增加多少条随机边
+    Generate random node pairs while keeping the graph connected.
+    :param nodes: List of nodes.
+    :param extra_edges_count: Number of random edges to add after connectivity is guaranteed.
     """
     if len(nodes) < 2:
         return []
     elif len(nodes) == 2:
         return [tuple(sorted((nodes[0], nodes[1])))]
     
-    pairs = set() # 使用集合避免重复边
+    pairs = set()  # Use a set to avoid duplicate edges.
     for i in range(len(nodes)):
         pair1 = tuple(sorted((nodes[i],nodes[(i + 1) % len(nodes)])))
         pairs.add(pair1)
@@ -229,20 +229,20 @@ def generate_connected_pairs(nodes, extra_edges_count=0):
             pair2 = tuple(sorted((nodes[i],nodes[int(i + 1+len(nodes)/2) % len(nodes)])))
             pairs.add(pair2)
     
-    # # 3. (可选) 添加额外的随机边，增加网络复杂度
-    # # 如果您只需要最基本的连通，可以让 extra_edges_count = 0
+    # # 3. Optionally add random edges to increase network complexity.
+    # # Set extra_edges_count to 0 when only basic connectivity is needed.
     # current_edge_count = len(pairs)
-    # max_edges = len(nodes) * (len(nodes) - 1) // 2 # 全连接图的边数
+    # max_edges = len(nodes) * (len(nodes) - 1) // 2  # Edge count of a complete graph.
     
-    # # 防止请求的额外边数超过最大可能的边数
+    # # Do not request more additional edges than the graph can contain.
     # target_count = min(current_edge_count + extra_edges_count, max_edges)
     
     # while len(pairs) < target_count:
-    #     # 随机选两个不同的节点
+    #     # Select two distinct nodes at random.
     #     u, v = random.sample(nodes, 2)
     #     pair = tuple(sorted((u, v)))
         
-    #     # 集合会自动去重，如果该边已存在则不会添加
+    #     # The set automatically ignores an edge that already exists.
     #     pairs.add(pair)
 
     return list(pairs)
@@ -323,42 +323,42 @@ def makeTransitAs(base: Base, asn: int, prefix: str, exchanges: List[int],
     return transit_as
 
 def find_maximal_cliques(edge_list):
-    # 1. 创建一个无向图
+    # 1. Create an undirected graph.
     G = nx.Graph()
 
-    # 2. 将列表 b 中的所有边添加到图中
+    # 2. Add every edge in the input list to the graph.
     G.add_edges_from(edge_list)
 
 
-    # 3. 查找图 G 中的所有极大团
-    # nx.find_cliques(G) 返回一个生成器(generator)，每个元素是一个 set
+    # 3. Find all maximal cliques in graph G.
+    # nx.find_cliques(G) returns a generator whose elements are sets.
     cliques_generator = nx.find_cliques(G)
 
-    # 4. 将结果转换为列表，并对每个团内部进行排序（以便于查看）
-    #    使用 sorted(list(clique)) 来匹配您期望的输出格式
+    # 4. Convert the result to a list and sort each clique for readability.
+    #    sorted(list(clique)) produces the expected output format.
     result = [sorted(list(clique)) for clique in cliques_generator]
     return result
 
 def load_topology_data(filename: str) -> dict:
-    """从文件加载拓扑数据（兼容 key: value 格式）"""
+    """Load topology data from a file that uses the ``key: value`` format."""
     with open(filename, 'r') as f:
         content = f.read().strip()
     
-    # 处理格式：添加外层大括号，替换冒号为冒号+引号，处理列表
-    # 1. 替换 key: 为 'key':
+    # Normalize the format by adding outer braces and quoting keys.
+    # 1. Replace key: with "key":.
     content = re.sub(r'^(\w+):', r'"\1":', content, flags=re.MULTILINE)
-    # 2. 每行末尾添加逗号（最后一行除外）
+    # 2. Add a comma to every line except the last one.
     lines = content.split('\n')
     lines = [line + ',' for line in lines[:-1]] + [lines[-1]] if lines else []
     content = '\n'.join(lines)
-    # 3. 包裹成字典
+    # 3. Wrap the content as a dictionary.
     content = '{' + content + '}'
     
-    # 安全解析为字典
+    # Parse the normalized content as a dictionary.
     try:
-        return eval(content)  # 此处使用eval是因为处理后的格式已符合Python字典规范
+        return eval(content)  # The normalized text now follows Python dictionary syntax.
     except Exception as e:
-        raise ValueError(f"解析拓扑数据失败: {e}")
+        raise ValueError(f"Failed to parse topology data: {e}")
 
 def run(dumpfile=None, hosts_per_as=2): 
     # Set the platform information
@@ -381,24 +381,24 @@ def run(dumpfile=None, hosts_per_as=2):
         x = args.x
         topology_file = args.topology_file or f"real_topology_{x}.txt"
         output_dir = args.output_dir or f"./output_{x}_exportAll"
-        print(f"接收到的参数 x 是: {x}")
-        print(f"拓扑输入文件: {topology_file}")
-        print(f"编译输出目录: {output_dir}")
+        print(f"Received x parameter: {x}")
+        print(f"Topology input file: {topology_file}")
+        print(f"Compilation output directory: {output_dir}")
     else:
         x = 214
         topology_file = f"real_topology_{x}.txt"
         output_dir = f"./output_{x}_exportAll"
 
-    # 加载拓扑数据
+    # Load topology data.
     try:
         TOPOLOGY_DATA = load_topology_data(topology_file)
         #TOPOLOGY_DATA = load_topology_data('real_topology_1897.txt')
         #TOPOLOGY_DATA = update_topology_from_file(TOPOLOGY_DATA,max_new_asns=100)
     except FileNotFoundError:
-        print("错误: 未找到real_topology_1078.txt文件")
+        print("Error: real_topology_1078.txt was not found")
         sys.exit(1)
     except Exception as e:
-        print(f"解析拓扑数据出错: {e}")
+        print(f"Failed to parse topology data: {e}")
         sys.exit(1)
 
     
@@ -407,19 +407,19 @@ def run(dumpfile=None, hosts_per_as=2):
     base  = Base()
     
     ###############################################################################
-    # 创建互联网交换点(IXP)
+    # Create Internet exchange points (IXPs).
     ix_objects = {}
     for ixp in TOPOLOGY_DATA["ixps"]:
         prefix = assignment[ixp]['ipv4']
         ix = assignment[ixp]['asn']
         address=str(IPv4Network(prefix)[ix])
         ix_obj = base.createInternetExchange(ix,prefix,rsAddress=address)
-        ix_obj.getPeeringLan().setDisplayName(f'IX-{ix}')  # 设置显示名称
+        ix_obj.getPeeringLan().setDisplayName(f'IX-{ix}')  # Set the display name.
         ix_objects[ix] = ix_obj
-        print(f"创建IXP: {ix} (显示名称: IX-{ix})")
+        print(f"Created IXP {ix} (display name: IX-{ix})")
     
     ###############################################################################
-    # 收集Transit AS的连接信息
+    # Collect transit-AS connectivity information.
     transit_info = {}
     for asn in TOPOLOGY_DATA["transit_asns"]:
         asn = assignment[asn]['asn']
@@ -438,7 +438,7 @@ def run(dumpfile=None, hosts_per_as=2):
     #     transit_info = pickle.load(f)
     
     ###############################################################################
-    # 创建Transit Autonomous Systems
+    # Create transit autonomous systems.
     Aslist=[3,1,0]
     index =0
     for asnuber in TOPOLOGY_DATA["transit_asns"]:
@@ -453,11 +453,11 @@ def run(dumpfile=None, hosts_per_as=2):
         clique=sorted(exchanges)
         links=generate_connected_pairs(clique, min(2*len(clique),253-len(clique)))
         makeTransitAs(base, asn, prefix, exchanges, list(set(links)),rrNum=1)
-        print(f"创建Transit AS{asn}: 连接IXP{exchanges}, 内部链路{links}")
+        print(f"Created transit AS{asn}: IXPs={exchanges}, internal links={links}")
         index+=1
     
     ###############################################################################
-    # 创建Stub AS并添加主机
+    # Create stub ASes and add hosts.
 
     stub_ix_map = {}
     for (provider, customer, ix, rel) in TOPOLOGY_DATA["as_as_ix_edges"]:
@@ -471,32 +471,32 @@ def run(dumpfile=None, hosts_per_as=2):
         prefix=assignment_temp[stub_asn]['ipv4']
         ix = assignment_temp[stub_ix_map[stub_asn]]['asn']
         makeStubAsWithHosts(emu, base, asn, prefix, ix, hosts_total=0)
-        print(f"创建Stub AS{asn}: 连接IXP{ix}, 主机数量{hosts_per_as}")
+        print(f"Created stub AS{asn}: IXP={ix}, host count={hosts_per_as}")
     
-    # 配置私有对等关系
+    # Configure private peerings.
     for (a, b, ix, rel) in TOPOLOGY_DATA["as_as_ix_edges"]:
         a = assignment_temp[a]['asn']
         b = assignment_temp[b]['asn']
         ix = assignment_temp[ix]['asn']
         rel = int(rel)
-        # 转换关系: -1→Provider, 0→Peer
+        # Convert relationships: -1 to Provider, 0 to Peer.
         if rel == -1:
             relationship = PeerRelationship.Provider
         elif rel == 0:
             relationship = PeerRelationship.Peer###########
         else:
-            raise ValueError(f"无效关系值: {rel} (仅支持-1和0)")
+            raise ValueError(f"Invalid relationship value: {rel} (only -1 and 0 are supported)")
         
         ebgp.addPrivatePeerings(ix, [a], [b], relationship)
-        print(f"IXP{ix}配置私有对等: AS{a}与AS{b} (关系: {rel})")
+        print(f"Configured private peering at IXP{ix}: AS{a} and AS{b} (relationship: {rel})")
 
     #add_traffic(base, emu, TOPOLOGY_DATA["stub_asns"], assignment_temp, num=5)
     t=time.time()
 
-    print("开始编译仿真网络...")
+    print("Compiling the emulated network...")
     ######################################################
     # #########################
-    # 添加所有层到仿真器
+    # Add all layers to the emulator.
     emu.addLayer(base)
     emu.addLayer(Routing())
     emu.addLayer(ebgp)
@@ -504,17 +504,17 @@ def run(dumpfile=None, hosts_per_as=2):
     emu.addLayer(Ospf())
     
     ###############################################################################
-    # 输出结果
+    # Write the result.
     if dumpfile is not None:
-        # 保存到文件供其他仿真器使用
+        # Save to a file for use by other emulators.
         emu.dump(dumpfile)
     else:
         emu.render()
-        # 附加Internet Map容器并编译
+        # Attach the Internet Map container and compile.
         docker = Docker(platform=platform)
         emu.compile(docker, output_dir, override=True)#f'real_topology_{x}.txt'
-        print(f"仿真网络编译完成，输出目录: {output_dir}")
-    print(f"编译时间: {time.time()-t} 秒")
+        print(f"Emulated network compilation completed; output directory: {output_dir}")
+    print(f"Compilation time: {time.time()-t} seconds")
 
 if __name__ == "__main__":
     run()

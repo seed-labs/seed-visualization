@@ -2,10 +2,8 @@ package dockeriface
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -148,42 +146,48 @@ func Discover(ctx context.Context, socketPath string, opts DiscoverOptions) ([]I
 		maxConcurrency = 32
 	}
 
+	workerCount := min(maxConcurrency, len(seedContainers))
+	jobs := make(chan seedContainerInfo, workerCount)
 	var (
 		mu       sync.Mutex
 		wg       sync.WaitGroup
 		firstErr error
 		result   []Interface
 	)
-	sem := make(chan struct{}, maxConcurrency)
 
-	for _, container := range seedContainers {
-		container := container
-		wg.Add(1)
+	wg.Add(workerCount)
+	for range workerCount {
 		go func() {
 			defer wg.Done()
-
-			select {
-			case sem <- struct{}{}:
-				defer func() { <-sem }()
-			case <-ctx.Done():
+			for container := range jobs {
+				items, err := discoverContainerInterfaces(ctx, client, container, hostInterfaces, networkIndex)
 				mu.Lock()
-				if firstErr == nil {
-					firstErr = ctx.Err()
+				if err != nil {
+					if firstErr == nil {
+						firstErr = err
+					}
+				} else {
+					result = append(result, items...)
 				}
 				mu.Unlock()
-				return
 			}
-
-			items, err := discoverContainerInterfaces(ctx, client, container, hostInterfaces, networkIndex)
-			mu.Lock()
-			defer mu.Unlock()
-			if err != nil && firstErr == nil {
-				firstErr = err
-				return
-			}
-			result = append(result, items...)
 		}()
 	}
+
+sendJobs:
+	for _, container := range seedContainers {
+		select {
+		case jobs <- container:
+		case <-ctx.Done():
+			mu.Lock()
+			if firstErr == nil {
+				firstErr = ctx.Err()
+			}
+			mu.Unlock()
+			break sendJobs
+		}
+	}
+	close(jobs)
 	wg.Wait()
 	if firstErr != nil {
 		return nil, firstErr
@@ -440,60 +444,6 @@ type containerInterface struct {
 	IfIndex int
 	IfLink  int
 	MAC     string
-}
-
-type ipLinkInfo struct {
-	IfIndex   int    `json:"ifindex"`
-	IfName    string `json:"ifname"`
-	LinkIndex int    `json:"link_index"`
-	Address   string `json:"address"`
-}
-
-func containerInterfaces(ctx context.Context, pid int) ([]containerInterface, error) {
-	out, err := nsenterOutput(ctx, pid, "ip", "-j", "link")
-	if err != nil {
-		return nil, err
-	}
-
-	var links []ipLinkInfo
-	if err := json.Unmarshal([]byte(out), &links); err != nil {
-		return nil, err
-	}
-
-	result := make([]containerInterface, 0, len(links))
-	for _, link := range links {
-		if link.IfName == "lo" {
-			continue
-		}
-		if link.LinkIndex == 0 {
-			continue
-		}
-		result = append(result, containerInterface{
-			Name:    link.IfName,
-			IfIndex: link.IfIndex,
-			IfLink:  link.LinkIndex,
-			MAC:     strings.ToLower(strings.TrimSpace(link.Address)),
-		})
-	}
-	return result, nil
-}
-
-func nsenterInt(ctx context.Context, pid int, path string) (int, error) {
-	out, err := nsenterOutput(ctx, pid, "cat", path)
-	if err != nil {
-		return 0, err
-	}
-	return strconv.Atoi(strings.TrimSpace(out))
-}
-
-func nsenterOutput(ctx context.Context, pid int, args ...string) (string, error) {
-	fullArgs := append([]string{"-t", strconv.Itoa(pid), "-n"}, args...)
-	cmd := exec.CommandContext(ctx, "nsenter", fullArgs...)
-	out, err := cmd.Output()
-	if err != nil {
-		return "", err
-	}
-	return string(out), nil
 }
 
 func readIntFile(path string) (int, error) {

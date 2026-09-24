@@ -1,20 +1,20 @@
 name: CI InternetMap-Satellite Frontend
 
 on:
-  # pull_request:
-  #   branches:
-  #     - main
-  #   paths:
-  #     - "InternetMap-Satellite/**"
-  #     - "docker-compose.yml"
-  #     - ".github/workflows/ci-internet-map-satellite.yaml"
-  # push:
-  #   branches:
-  #     - main
-  #   paths:
-  #     - "InternetMap-Satellite/**"
-  #     - "docker-compose.yml"
-  #     - ".github/workflows/ci-internet-map-satellite.yaml"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "InternetMap-Satellite/**"
+      - "docker-compose.yml"
+      - ".github/workflows/ci-internet-map-satellite.yaml"
+  push:
+    branches:
+      - main
+    paths:
+      - "InternetMap-Satellite/**"
+      - "docker-compose.yml"
+      - ".github/workflows/ci-internet-map-satellite.yaml"
   workflow_call:
     inputs:
       run-static-checks:
@@ -103,11 +103,11 @@ jobs:
         run: pnpm run build
 
       - name: Install Playwright browser
-        if: ${{ github.event_name != 'workflow_dispatch' || inputs.run-e2e-tests }}
+        if: ${{ env.LOCAL_CI_RUNNER == '1' }}
         run: pnpm exec playwright install --with-deps chromium
 
       - name: E2E tests
-        if: ${{ github.event_name != 'workflow_dispatch' || inputs.run-e2e-tests }}
+        if: ${{ env.LOCAL_CI_RUNNER == '1' }}
         env:
           TEST_COVERAGE_SCOPE: |
             - Dashboard bootstrap: mocked satellite orbit data, gateway data, containers, and WebSocket startup.
@@ -119,13 +119,6 @@ jobs:
             - Traffic Replay: filter submission, recording guardrails, packet recording, playback, pause, jump, seek, stop, clear, and container-node search.
             - Real Cesium smoke test: real 3D globe canvas initialization with UI overlays still usable.
         run: pnpm run test:e2e
-
-      - name: Upload Playwright report
-        if: ${{ always() && (github.event_name != 'workflow_dispatch' || inputs.run-e2e-tests) }}
-        uses: actions/upload-artifact@v6
-        with:
-          name: internet-map-satellite-playwright-report
-          path: InternetMap-Satellite/frontend/playwright-report
 
       - name: Docker build
         if: ${{ github.event_name != 'workflow_dispatch' || inputs.run-docker-build }}

@@ -32,15 +32,27 @@ export class Sniffer implements LogProducer {
     async sniff(nodes: string[], expr: string) {
         this._logger.debug(`sniffing on ${nodes.length} nodes with expr ${expr}...`);
 
-        let sessions = await Promise.all(nodes.map(node => this._sessionManager.getSession(node, ['/seedemu_sniffer'], true)));
-
-        sessions.forEach(session => {
-            try {
-                session.stream.write(`${expr}\r`);
-            } catch (e) {
-                this._logger.error("error communicating with node.");
+        const configured = Number.parseInt(process.env.SNIFFER_SESSION_CONCURRENCY || '', 10);
+        const concurrency = Number.isFinite(configured) && configured > 0
+            ? configured : Sniffer.DEFAULT_SESSION_CONCURRENCY;
+        let nextNode = 0;
+        let firstError: unknown;
+        const worker = async () => {
+            while (nextNode < nodes.length) {
+                const node = nodes[nextNode++];
+                try {
+                    let session = this._sessionManager.getExistingSession(node);
+                    if (!session && !expr.trim()) continue;
+                    session ??= await this._sessionManager.getSession(node, ['/seedemu_sniffer'], true);
+                    session.stream.write(`${expr}\r`);
+                } catch (error) {
+                    this._logger.error(`error communicating with node ${node}: ${error}`);
+                    firstError ??= error;
+                }
             }
-        });
+        };
+        await Promise.all(Array.from({length: Math.min(concurrency, nodes.length)}, () => worker()));
+        if (firstError) throw firstError;
     }
 
     setListener(listener: (nodeId: string, stdout: any) => void) {

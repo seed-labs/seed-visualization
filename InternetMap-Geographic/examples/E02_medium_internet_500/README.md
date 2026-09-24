@@ -28,7 +28,7 @@ A dedicated Linux emulation host is recommended:
 | Docker | Docker Engine + Compose v2 | Recent stable version |
 | Python | 3.10 or later | Match the SEED Emulator environment |
 
-Live capture requires eBPF support, mounted debugfs/BPF file systems, and permission to run `seedmu_traffic_observer_service` in privileged and host-network modes.
+Live capture requires eBPF support, mounted debugfs/BPF file systems, and permission to run `seedemu_traffic_observer_service` in privileged and host-network modes.
 
 The scripts require Bash, Docker CLI, and the `ping`, `nc`, and `dd` tools already present in node images. They do not install software in containers.
 
@@ -72,7 +72,7 @@ In another terminal, start the supporting services from the repository root:
 docker compose up -d --build \
   seedemu_emulator_service \
   seedemu_internet_map_geographic \
-  seedmu_traffic_observer_service
+  seedemu_traffic_observer_service
 ```
 
 Open:
@@ -203,7 +203,7 @@ Recommended endurance run:
 
 Verify these recovery scenarios in order:
 
-1. Restart `seedmu_traffic_observer_service` and confirm WebSocket/capture reconnection.
+1. Restart `seedemu_traffic_observer_service` and confirm WebSocket/capture reconnection.
 2. Restart `seedemu_emulator_service` and confirm live topology recovery.
 3. Refresh the page or restart `seedemu_internet_map_geographic` and reload the same topology.
 4. Run `./scripts/traffic_stress.sh stop` and confirm new events stop.

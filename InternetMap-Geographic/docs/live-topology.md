@@ -106,7 +106,7 @@ Check:
 
 Check:
 
-1. Whether `seedmu_traffic_observer_service` is running.
+1. Whether `seedemu_traffic_observer_service` is running.
 2. Whether the filter matches real traffic.
 3. Whether the traffic observer has discovered container veth interfaces.
 4. Whether container names and IP addresses in packet JSON can be matched to the current topology.

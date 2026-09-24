@@ -54,4 +54,34 @@ describe('Sniffer', () => {
 
         streams.forEach(stream => stream.destroy());
     });
+
+    it('reuses sessions when changing filters across 1000 nodes', async () => {
+        const streams = new Map<string, PassThrough>();
+        const writes = new Map<string, string[]>();
+        const runtime = {
+            kind: 'docker',
+            resolveNodeId: jest.fn(async () => { throw new Error('already resolved'); }),
+            openSession: jest.fn(async (nodeId: string) => {
+                const stream = new PassThrough();
+                streams.set(nodeId, stream);
+                const commands: string[] = [];
+                writes.set(nodeId, commands);
+                stream.on('data', chunk => commands.push(chunk.toString()));
+                return {nodeId, stream};
+            }),
+        } as unknown as RuntimeClient;
+        const sniffer = new Sniffer(runtime);
+        sniffer.getLoggers().forEach(logger => logger.setSettings({minLevel: 'warn'}));
+        const ids = Array.from({length: 1000}, (_, index) => `node-${index}`);
+
+        await sniffer.sniff(ids, 'icmp');
+        await sniffer.sniff(ids, 'udp');
+
+        expect(runtime.resolveNodeId).not.toHaveBeenCalled();
+        expect(runtime.openSession).toHaveBeenCalledTimes(ids.length);
+        expect(writes.size).toBe(ids.length);
+        expect(writes.get('node-0')).toEqual(['icmp\r', 'udp\r']);
+        expect(writes.get('node-999')).toEqual(['icmp\r', 'udp\r']);
+        streams.forEach(stream => stream.destroy());
+    });
 });

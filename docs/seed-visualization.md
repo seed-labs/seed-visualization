@@ -60,7 +60,7 @@ flowchart TB
 - `seedemu_internet_map_geographic`
 - `seedemu_internet_map_satellite`
 - `seedemu_satellite_emulator_service`
-- `seedmu_traffic_observer_service`
+- `seedemu_traffic_observer_service`
 
 默认端口：
 

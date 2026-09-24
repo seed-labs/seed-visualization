@@ -26,7 +26,7 @@ A dedicated Linux emulation host is recommended:
 | Docker | Docker Engine + Compose v2 | A recent stable release |
 | Python | 3.10 or later | Match the SEED Emulator environment |
 
-Live capture also requires eBPF support, mounted debugfs/BPF file systems, and permission to run `seedmu_traffic_observer_service` in privileged and host-network modes.
+Live capture also requires eBPF support, mounted debugfs/BPF file systems, and permission to run `seedemu_traffic_observer_service` in privileged and host-network modes.
 
 The helper scripts require Bash, Docker CLI, and the `ping`, `nc`, and `dd` utilities included in the base node image. They do not install additional software in containers.
 
@@ -67,7 +67,7 @@ In another terminal, start the visualization, Docker API, and traffic capture se
 docker compose up -d --build \
   seedemu_emulator_service \
   seedemu_internet_map_geographic \
-  seedmu_traffic_observer_service
+  seedemu_traffic_observer_service
 ```
 
 Open:
@@ -140,5 +140,5 @@ To stop the repository-level services, run from the repository root:
 docker compose stop \
   seedemu_emulator_service \
   seedemu_internet_map_geographic \
-  seedmu_traffic_observer_service
+  seedemu_traffic_observer_service
 ```

@@ -94,4 +94,36 @@ describe('usePacketReplayPlayback', () => {
     await togglePromise
     expect(value.played).toEqual([1])
   })
+
+  it('pauses without advancing, resumes from the next packet, and can restart after completion', async () => {
+    vi.useFakeTimers()
+    const value = createPlayback([packet(0), packet(10), packet(20)])
+    await value.playback.toggle()
+    expect(value.played).toEqual([1])
+    await value.playback.toggle()
+    expect(value.paused.value).toBe(true)
+    await vi.advanceTimersByTimeAsync(500)
+    expect(value.index.value).toBe(1)
+    await value.playback.toggle()
+    expect(value.played).toEqual([1, 2])
+    await vi.advanceTimersByTimeAsync(100)
+    expect(value.played).toEqual([1, 2, 3])
+    await vi.advanceTimersByTimeAsync(100)
+    expect(value.playing.value).toBe(false)
+    await value.playback.toggle()
+    expect(value.played).toEqual([1, 2, 3, 1])
+  })
+
+  it('uses the gap between consecutive timeline batches, not the window size', async () => {
+    vi.useFakeTimers()
+    const value = createPlayback([packet(0), packet(20), packet(100)])
+    value.timingMode.value = 'timeline'
+    await value.playback.toggle()
+    expect(value.batches).toEqual([[0, 2]])
+    await vi.advanceTimersByTimeAsync(79)
+    expect(value.batches).toEqual([[0, 2]])
+    await vi.advanceTimersByTimeAsync(1)
+    expect(value.batches).toEqual([[0, 2], [2, 3]])
+    expect(value.index.value).toBe(3)
+  })
 })

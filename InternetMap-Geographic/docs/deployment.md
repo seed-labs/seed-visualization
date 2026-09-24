@@ -36,7 +36,7 @@ docker compose up --build seedemu_emulator_service seedemu_internet_map_geograph
 ### Topology viewing with live packet capture
 
 ```bash
-docker compose up --build seedemu_emulator_service seedemu_internet_map_geographic seedmu_traffic_observer_service
+docker compose up --build seedemu_emulator_service seedemu_internet_map_geographic seedemu_traffic_observer_service
 ```
 
 ### Full visualization stack

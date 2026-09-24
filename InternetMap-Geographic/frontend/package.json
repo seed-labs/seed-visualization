@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc -b && vite build",
+    "build:e2e": "vite build --mode e2e",
     "build-test": "vue-tsc --skipLibCheck && vite build",
     "typecheck": "vue-tsc -b",
     "test:unit": "vitest run",

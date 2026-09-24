@@ -43,7 +43,7 @@ Expected result: experiment host and router containers are running. Wait for rou
 In another terminal, return to the repository root:
 
 ```bash
-docker compose up -d --build seedemu_emulator_service seedemu_internet_map_geographic seedmu_traffic_observer_service
+docker compose up -d --build seedemu_emulator_service seedemu_internet_map_geographic seedemu_traffic_observer_service
 ```
 
 The live-topology Docker API and packet-capture service must observe the same emulation containers. The default Compose deployment uses the local Docker socket, so run it on the same Linux host. These tests use port 8090. Avoid a port conflict if the installed SEED Emulator version also generates a built-in map service.

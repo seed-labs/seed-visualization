@@ -1,22 +1,22 @@
 name: CI Traffic Observer Service
 
 on:
-  # pull_request:
-  #   branches:
-  #     - main
-  #   paths:
-  #     - "traffic-observer-service/**"
-  #     - "shared/go/docker-api/**"
-  #     - "docker-compose.yml"
-  #     - ".github/workflows/ci-traffic-observer-service.yaml"
-  # push:
-  #   branches:
-  #     - main
-  #   paths:
-  #     - "traffic-observer-service/**"
-  #     - "shared/go/docker-api/**"
-  #     - "docker-compose.yml"
-  #     - ".github/workflows/ci-traffic-observer-service.yaml"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "traffic-observer-service/**"
+      - "shared/go/docker-api/**"
+      - "docker-compose.yml"
+      - ".github/workflows/ci-traffic-observer-service.yaml"
+  push:
+    branches:
+      - main
+    paths:
+      - "traffic-observer-service/**"
+      - "shared/go/docker-api/**"
+      - "docker-compose.yml"
+      - ".github/workflows/ci-traffic-observer-service.yaml"
   workflow_call:
     inputs:
       run-static-checks:
@@ -137,4 +137,4 @@ jobs:
 
       - name: Docker build
         if: ${{ github.event_name != 'workflow_dispatch' || inputs.run-docker-build }}
-        run: docker compose build seedmu_traffic_observer_service
+        run: docker compose build seedemu_traffic_observer_service

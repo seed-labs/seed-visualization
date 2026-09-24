@@ -1,32 +1,32 @@
 name: CI Docker Lifecycle Probes
 
 on:
-  # pull_request:
-  #   branches:
-  #     - main
-  #   paths:
-  #     - "emulator-service/**"
-  #     - "InternetMap-Toplogy/**"
-  #     - "InternetMap-Geographic/**"
-  #     - "InternetMap-Satellite/**"
-  #     - "satellite-emulator-service/**"
-  #     - "traffic-observer-service/**"
-  #     - "docker-compose.yml"
-  #     - "ci/**"
-  #     - ".github/workflows/ci-docker-lifecycle.yaml"
-  # push:
-  #   branches:
-  #     - main
-  #   paths:
-  #     - "emulator-service/**"
-  #     - "InternetMap-Toplogy/**"
-  #     - "InternetMap-Geographic/**"
-  #     - "InternetMap-Satellite/**"
-  #     - "satellite-emulator-service/**"
-  #     - "traffic-observer-service/**"
-  #     - "docker-compose.yml"
-  #     - "ci/**"
-  #     - ".github/workflows/ci-docker-lifecycle.yaml"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "emulator-service/**"
+      - "InternetMap-Toplogy/**"
+      - "InternetMap-Geographic/**"
+      - "InternetMap-Satellite/**"
+      - "satellite-emulator-service/**"
+      - "traffic-observer-service/**"
+      - "docker-compose.yml"
+      - "ci/**"
+      - ".github/workflows/ci-docker-lifecycle.yaml"
+  push:
+    branches:
+      - main
+    paths:
+      - "emulator-service/**"
+      - "InternetMap-Toplogy/**"
+      - "InternetMap-Geographic/**"
+      - "InternetMap-Satellite/**"
+      - "satellite-emulator-service/**"
+      - "traffic-observer-service/**"
+      - "docker-compose.yml"
+      - "ci/**"
+      - ".github/workflows/ci-docker-lifecycle.yaml"
   workflow_call: {}
   workflow_dispatch: {}
 
@@ -41,7 +41,7 @@ jobs:
         uses: actions/checkout@v5
 
       - name: Build lifecycle images
-        run: docker compose build seedemu_emulator_service seedemu_satellite_emulator_service seedmu_traffic_observer_service seedemu_internet_map_toplogy seedemu_internet_map_geographic seedemu_internet_map_satellite
+        run: docker compose build seedemu_emulator_service seedemu_satellite_emulator_service seedemu_traffic_observer_service seedemu_internet_map_toplogy seedemu_internet_map_geographic seedemu_internet_map_satellite
 
       - name: Run compose lifecycle probes
         run: bash ci/probe-docker-compose.sh

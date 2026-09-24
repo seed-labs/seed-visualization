@@ -782,6 +782,12 @@ function selectRenderableLabelIds(nodes: GlobeNode[], showRouterLabels: boolean,
   return selected
 }
 
+function countE2eMetric(name: 'graphUpdates' | 'visibilityUpdates' | 'topologyClears' | 'frames') {
+  if (import.meta.env.MODE !== 'e2e') return
+  const metrics = (window as any).__dockMetrics
+  if (metrics && typeof metrics[name] === 'number') metrics[name] += 1
+}
+
 export function createMap3DScene(container: HTMLElement, options: Map3DSceneOptions = {}): Map3DSceneApi {
   const mode = options.mode ?? 'globe'
   const is2DMode = mode === '2d'
@@ -948,6 +954,7 @@ export function createMap3DScene(container: HTMLElement, options: Map3DSceneOpti
   }
 
   function setTopologyVisibility(visibleTypes: Map3DRenderOptions['visibleTypes'] = {}) {
+    countE2eMetric('visibilityUpdates')
     for (const left of TOPOLOGY_TYPES) {
       const visible = visibleTypes[left] !== false
       points.setGroupShow(left, visible)
@@ -963,6 +970,7 @@ export function createMap3DScene(container: HTMLElement, options: Map3DSceneOpti
   }
 
   function renderGraph(graph: GlobeGraph, options: Map3DRenderOptions = {}) {
+    countE2eMetric('graphUpdates')
     // Visibility is a presentation-only option and must not invalidate cached
     // positions, curves, or GPU geometry.
     const { visibleTypes: _visibleTypes, ...geometryOptions } = options
@@ -987,6 +995,7 @@ export function createMap3DScene(container: HTMLElement, options: Map3DSceneOpti
       flashPoints.removeAll()
       billboards.removeAll()
       labels.removeAll()
+      countE2eMetric('topologyClears')
       lines.removeAll()
       starBillboards.clear()
       starNodes.clear()
@@ -1175,6 +1184,9 @@ export function createMap3DScene(container: HTMLElement, options: Map3DSceneOpti
     }
   }
 
+  if (import.meta.env.MODE === 'e2e') {
+    viewer.scene.preRender.addEventListener(() => countE2eMetric('frames'))
+  }
   viewer.scene.preRender.addEventListener(updatePacketHops)
 
   // postUpdate runs even when no frame is drawn; delayed hops must also wake rendering.

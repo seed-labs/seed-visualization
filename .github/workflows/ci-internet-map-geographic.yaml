@@ -1,20 +1,20 @@
 name: CI InternetMap-Geographic Frontend
 
 on:
-  # pull_request:
-  #   branches:
-  #     - main
-  #   paths:
-  #     - "InternetMap-Geographic/**"
-  #     - "docker-compose.yml"
-  #     - ".github/workflows/ci-internet-map-geographic.yaml"
-  # push:
-  #   branches:
-  #     - main
-  #   paths:
-  #     - "InternetMap-Geographic/**"
-  #     - "docker-compose.yml"
-  #     - ".github/workflows/ci-internet-map-geographic.yaml"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "InternetMap-Geographic/**"
+      - "docker-compose.yml"
+      - ".github/workflows/ci-internet-map-geographic.yaml"
+  push:
+    branches:
+      - main
+    paths:
+      - "InternetMap-Geographic/**"
+      - "docker-compose.yml"
+      - ".github/workflows/ci-internet-map-geographic.yaml"
   workflow_call:
     inputs:
       run-static-checks:
@@ -22,10 +22,6 @@ on:
         required: false
         default: true
       run-unit-tests:
-        type: boolean
-        required: false
-        default: true
-      run-e2e-tests:
         type: boolean
         required: false
         default: true
@@ -42,11 +38,6 @@ on:
         default: true
       run-unit-tests:
         description: "Run unit tests"
-        type: boolean
-        required: false
-        default: true
-      run-e2e-tests:
-        description: "Run browser E2E tests"
         type: boolean
         required: false
         default: true
@@ -103,23 +94,17 @@ jobs:
         run: pnpm run build
 
       - name: Install Playwright browser
-        if: ${{ github.event_name != 'workflow_dispatch' || inputs.run-e2e-tests }}
+        # local_ci.py runs local steps without evaluating GitHub expressions.
+        if: ${{ env.LOCAL_CI_RUNNER == '1' }}
         run: pnpm exec playwright install --with-deps chromium
 
       - name: E2E tests
-        if: ${{ github.event_name != 'workflow_dispatch' || inputs.run-e2e-tests }}
+        if: ${{ env.LOCAL_CI_RUNNER == '1' }}
         env:
           TEST_COVERAGE_SCOPE: |
             - Live emulator topology pages: Docker API-backed 3D/2D route loading and dock rendering.
             - Uploaded emulator topology pages: compose upload entry on both 3D and 2D routes.
         run: pnpm run test:e2e
-
-      - name: Upload Playwright report
-        if: ${{ always() && (github.event_name != 'workflow_dispatch' || inputs.run-e2e-tests) }}
-        uses: actions/upload-artifact@v6
-        with:
-          name: internet-map-geographic-playwright-report
-          path: InternetMap-Geographic/frontend/playwright-report
 
       - name: Docker build
         if: ${{ github.event_name != 'workflow_dispatch' || inputs.run-docker-build }}

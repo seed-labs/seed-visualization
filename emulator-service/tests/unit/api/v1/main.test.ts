@@ -88,17 +88,28 @@ describe('api v1 router', () => {
   });
 
   it('returns a sanitized server error when docker listContainers fails', async () => {
-    dockerMock.listContainers.mockRejectedValue(new Error('docker unavailable'));
+    const expectedError = new Error('docker unavailable');
+    const logError = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    try {
+      dockerMock.listContainers.mockRejectedValue(expectedError);
 
-    const response = await request(app).get('/api/v1/container').expect(500);
+      const response = await request(app).get('/api/v1/container').expect(500);
 
-    expect(response.body).toEqual({
-      ok: false,
-      error: {
-        code: 'INTERNAL_SERVER_ERROR',
-        message: 'Internal server error',
-      },
-    });
+      expect(response.body).toEqual({
+        ok: false,
+        error: {
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Internal server error',
+        },
+      });
+      expect(logError).toHaveBeenCalledWith(expect.objectContaining({
+        method: 'GET',
+        url: '/api/v1/container',
+        error: expectedError,
+      }));
+    } finally {
+      logError.mockRestore();
+    }
   });
 
   it('returns a structured response for unknown API routes', async () => {
@@ -225,6 +236,24 @@ describe('api v1 router', () => {
       ok: true,
       result: { currentFilter: 'icmp' },
     });
+  });
+
+  it('passes a large container set to the sniffer with one Docker listing per filter update', async () => {
+    const containers = Array.from({length: 1000}, (_, index) => ({
+      ...containerFixture,
+      Id: `node-${index}`,
+      Names: [`/node-${index}`],
+    }));
+    dockerMock.listContainers.mockResolvedValue(containers);
+    sniff.mockResolvedValue(undefined);
+
+    await request(app).post('/api/v1/sniff').send({filter: 'icmp'}).expect(200);
+    expect(dockerMock.listContainers).toHaveBeenCalledTimes(1);
+    expect(sniff).toHaveBeenCalledWith(containers.map(container => container.Id), 'icmp');
+
+    await request(app).post('/api/v1/sniff').send({filter: 'udp'}).expect(200);
+    expect(dockerMock.listContainers).toHaveBeenCalledTimes(2);
+    expect(sniff).toHaveBeenLastCalledWith(containers.map(container => container.Id), 'udp');
   });
 
   it('returns parameter error for packet capture without node id or name', async () => {

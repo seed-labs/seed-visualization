@@ -2,7 +2,12 @@
 **/dist/
 __pycache__
 example
+examples
 docs
 *.md
 tests
 .agents
+*.log
+test-results
+playwright-report
+bin

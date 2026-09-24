@@ -30,19 +30,6 @@ test('10k upload keeps dock tabs responsive', async ({ page }, testInfo) => {
       observer.observe(button, { attributes: true, attributeFilter: ['class'] });
     }, true);
   });
-  await page.route('**/cesiumScene*', async route => {
-    const response = await route.fetch();
-    const body = await response.text();
-    const instrumented = body.replace(/function renderGraph\(graph, \w+ = \{\}\) \{/, match => match + ' window.__dockMetrics.graphUpdates++;')
-      .replace('lines.removeAll();', 'window.__dockMetrics.topologyClears++; lines.removeAll();')
-      .replace(/function setTopologyVisibility\([^)]*\) \{/, match => match + ' window.__dockMetrics.visibilityUpdates++;')
-      .replace('viewer.scene.preRender.addEventListener(updatePacketHops)', 'viewer.scene.preRender.addEventListener(() => window.__dockMetrics.frames++); viewer.scene.preRender.addEventListener(updatePacketHops)');
-    expect(instrumented).not.toBe(body);
-    expect(instrumented).toContain('window.__dockMetrics.graphUpdates++;');
-    expect(instrumented).toContain('window.__dockMetrics.topologyClears++;');
-    expect(instrumented).toContain('window.__dockMetrics.visibilityUpdates++;');
-    await route.fulfill({ response, body: instrumented });
-  });
   await page.goto('/dev/upload/3d');
   await page.locator('input[type=file]').setInputFiles(path.resolve('../examples/E01_large_internet_10k/docker-compose-10k-with-geo.yml'));
   const uploadStartedAt = Date.now();
@@ -110,9 +97,8 @@ test('10k upload keeps dock tabs responsive', async ({ page }, testInfo) => {
     await picker.getByRole('combobox').press('Escape');
     expect(await page.evaluate(() => (window as any).__dockMetrics.graphUpdates)).toBe(updatesBeforeSelection);
 
-    const filterPopover = page.locator('.emulator-topology-3d-filter-popover:visible');
     await picker.getByRole('button', { name: filter.button, exact: true }).click();
-    await expect(filterPopover).toHaveCount(0);
+    await expect(picker).toHaveCount(0);
     await page.waitForFunction(updates => (window as any).__dockMetrics.graphUpdates > updates, updatesBeforeSelection);
     await expect(page.locator('.emulator-topology-loading-overlay')).toHaveCount(0, { timeout: 120_000 });
 

@@ -52,7 +52,7 @@ docker compose up --build seedemu_emulator_service seedemu_internet_map_geograph
 To enable live traffic replay, also start the traffic observer:
 
 ```bash
-docker compose up --build seedemu_emulator_service seedemu_internet_map_geographic seedmu_traffic_observer_service
+docker compose up --build seedemu_emulator_service seedemu_internet_map_geographic seedemu_traffic_observer_service
 ```
 
 Open:

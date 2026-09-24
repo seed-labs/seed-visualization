@@ -1,20 +1,20 @@
 name: CI Emulator Service
 
 on:
-  # pull_request:
-  #   branches:
-  #     - main
-  #   paths:
-  #     - "emulator-service/**"
-  #     - "docker-compose.yml"
-  #     - ".github/workflows/ci-emulator-service.yaml"
-  # push:
-  #   branches:
-  #     - main
-  #   paths:
-  #     - "emulator-service/**"
-  #     - "docker-compose.yml"
-  #     - ".github/workflows/ci-emulator-service.yaml"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "emulator-service/**"
+      - "docker-compose.yml"
+      - ".github/workflows/ci-emulator-service.yaml"
+  push:
+    branches:
+      - main
+    paths:
+      - "emulator-service/**"
+      - "docker-compose.yml"
+      - ".github/workflows/ci-emulator-service.yaml"
   workflow_call:
     inputs:
       run-static-checks:
@@ -98,7 +98,7 @@ jobs:
         run: npm run test:unit
 
       - name: Integration tests
-        if: ${{ github.event_name != 'workflow_dispatch' || inputs.run-integration-tests }}
+        if: ${{ env.LOCAL_CI_RUNNER == '1' }}
         env:
           TEST_COVERAGE_SCOPE: |
             - remote Docker API path: runtime frontend environment, container listing, network listing, specific container lookup, missing container errors, and invalid network-status requests.

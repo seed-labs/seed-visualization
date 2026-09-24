@@ -118,9 +118,15 @@ export default defineConfig(({mode}) => {
             proxy,
         },
         build: {
-            outDir: env.VITE_BUILD_OUTPUT_PATH || 'dist',
+            outDir: mode === 'e2e' ? 'dist/e2e' : env.VITE_BUILD_OUTPUT_PATH || 'dist',
             assetsDir: 'assets',
             rollupOptions: {
+                ...(mode === 'e2e' ? {
+                    input: {
+                        app: path.resolve(__dirname, 'index.html'),
+                        scene: path.resolve(__dirname, 'tests/e2e/scene-harness.html'),
+                    },
+                } : {}),
                 output: {
                     chunkFileNames: 'assets/js/[name]-[hash].js',
                     entryFileNames: 'assets/js/[name]-[hash].js',

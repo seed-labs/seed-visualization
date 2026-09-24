@@ -40,7 +40,7 @@ def main() -> int:
         print(
             "[local-ci] Missing Python dependency: PyYAML.\n"
             "[local-ci] Install local CI Python dependencies first:\n"
-            f"  {sys.executable} -m pip install -r scripts/requirements.txt",
+            f"  {sys.executable} -m pip install -r test-ci-local/requirements.txt",
             file=sys.stderr,
         )
         return 1
@@ -220,6 +220,7 @@ def run_job(
             **job_env,
             **normalize_env(step.get("env", {})),
             "CI": os.environ.get("CI", "true"),
+            "LOCAL_CI_RUNNER": "1",
         }
 
         status = run_command(str(command), cwd, step_env, args)

@@ -74,8 +74,8 @@
       - seed-visualization
     restart: unless-stopped
 
-  seedmu_traffic_observer_service:
-    container_name: seedmu_traffic_observer_service
+  seedemu_traffic_observer_service:
+    container_name: seedemu_traffic_observer_service
     image: handsonsecurity/seedemu-traffic-observer-service:1.0
     build:
       context: .

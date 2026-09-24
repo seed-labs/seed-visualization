@@ -1,20 +1,20 @@
 name: CI InternetMap-Toplogy Frontend
 
 on:
-  # pull_request:
-  #   branches:
-  #     - main
-  #   paths:
-  #     - "InternetMap-Toplogy/**"
-  #     - "docker-compose.yml"
-  #     - ".github/workflows/ci-internet-map-toplogy.yaml"
-  # push:
-  #   branches:
-  #     - main
-  #   paths:
-  #     - "InternetMap-Toplogy/**"
-  #     - "docker-compose.yml"
-  #     - ".github/workflows/ci-internet-map-toplogy.yaml"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "InternetMap-Toplogy/**"
+      - "docker-compose.yml"
+      - ".github/workflows/ci-internet-map-toplogy.yaml"
+  push:
+    branches:
+      - main
+    paths:
+      - "InternetMap-Toplogy/**"
+      - "docker-compose.yml"
+      - ".github/workflows/ci-internet-map-toplogy.yaml"
   workflow_call:
     inputs:
       run-static-checks:
@@ -104,11 +104,11 @@ jobs:
         run: pnpm run build
 
       - name: Install Playwright browser
-        if: ${{ github.event_name != 'workflow_dispatch' || inputs.run-e2e-tests }}
+        if: ${{ env.LOCAL_CI_RUNNER == '1' }}
         run: pnpm exec playwright install --with-deps chromium
 
       - name: E2E tests
-        if: ${{ github.event_name != 'workflow_dispatch' || inputs.run-e2e-tests }}
+        if: ${{ env.LOCAL_CI_RUNNER == '1' }}
         env:
           TEST_COVERAGE_SCOPE: |
             - Dashboard: loading, empty, error, normal node/network tables, multi-interface nodes, and multi-network rendering.
@@ -118,13 +118,6 @@ jobs:
             - Transit Map page: settings panel and transit controls.
             - Upload Map page: upload panel and shared 2D map controls.
         run: pnpm run test:e2e
-
-      - name: Upload Playwright report
-        if: ${{ always() && (github.event_name != 'workflow_dispatch' || inputs.run-e2e-tests) }}
-        uses: actions/upload-artifact@v6
-        with:
-          name: internet-map-toplogy-playwright-report
-          path: InternetMap-Toplogy/frontend/playwright-report
 
       - name: Docker build
         if: ${{ github.event_name != 'workflow_dispatch' || inputs.run-docker-build }}

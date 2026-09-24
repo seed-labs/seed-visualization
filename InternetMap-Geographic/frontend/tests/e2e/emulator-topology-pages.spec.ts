@@ -5,7 +5,7 @@ for (const mode of ['3d', '2d'] as const) {
   test.describe(`InternetMap-Geographic ${mode} emulator topology pages`, () => {
     test('live emulator topology page loads from mocked Docker API data', async ({ page }) => {
       await mockInternetMapBackends(page);
-      await page.goto(`/dev/map/${mode}`);
+      await page.goto(`/dev/map/${mode}`, { waitUntil: 'domcontentloaded' });
 
       const dock = page.getByTestId('emulator-topology-3d-dock');
       await expect(dock).toBeVisible({ timeout: 15_000 });

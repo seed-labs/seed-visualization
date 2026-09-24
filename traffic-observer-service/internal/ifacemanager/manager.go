@@ -15,7 +15,12 @@ type Manager struct {
 	mu           sync.RWMutex
 	dockerSocket string
 	options      dockeriface.DiscoverOptions
-	probe        *probe.Probe
+	attach       interface {
+		ReplaceInterfaces([]string) error
+		InterfaceNames() []string
+		InterfaceCount() int
+	}
+	discover func(context.Context, string, dockeriface.DiscoverOptions) ([]dockeriface.Interface, error)
 
 	containerInterfaces []dockeriface.Interface
 	containerIndex      dockeriface.Index
@@ -31,20 +36,21 @@ func New(dockerSocket string, options dockeriface.DiscoverOptions, packetProbe *
 	return &Manager{
 		dockerSocket:   dockerSocket,
 		options:        options,
-		probe:          packetProbe,
+		attach:         packetProbe,
+		discover:       dockeriface.Discover,
 		containerIndex: dockeriface.NewIndex(nil),
 		interfaceNames: packetProbe.InterfaceNames(),
 	}
 }
 
 func (m *Manager) SetExplicitInterfaces(names []string) error {
-	if err := m.probe.ReplaceInterfaces(names); err != nil {
+	if err := m.attach.ReplaceInterfaces(names); err != nil {
 		return err
 	}
 
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.interfaceNames = m.probe.InterfaceNames()
+	m.interfaceNames = m.attach.InterfaceNames()
 	return nil
 }
 
@@ -64,21 +70,21 @@ func (m *Manager) EnsureReady(ctx context.Context) (Snapshot, error) {
 }
 
 func (m *Manager) Refresh(ctx context.Context) (Snapshot, error) {
-	containerInterfaces, err := dockeriface.Discover(ctx, m.dockerSocket, m.options)
+	containerInterfaces, err := m.discover(ctx, m.dockerSocket, m.options)
 	if err != nil {
 		return m.Snapshot(), err
 	}
 
 	containerIndex := dockeriface.NewIndex(containerInterfaces)
 	interfaceNames := containerIndex.HostInterfaceNames()
-	if err := m.probe.ReplaceInterfaces(interfaceNames); err != nil {
+	if err := m.attach.ReplaceInterfaces(interfaceNames); err != nil {
 		return m.Snapshot(), err
 	}
 
 	m.mu.Lock()
 	m.containerInterfaces = append([]dockeriface.Interface(nil), containerInterfaces...)
 	m.containerIndex = containerIndex
-	m.interfaceNames = m.probe.InterfaceNames()
+	m.interfaceNames = m.attach.InterfaceNames()
 	snapshot := m.snapshotLocked()
 	m.mu.Unlock()
 
@@ -86,7 +92,7 @@ func (m *Manager) Refresh(ctx context.Context) (Snapshot, error) {
 }
 
 func (m *Manager) AttachedInterfaceCount() int {
-	return m.probe.InterfaceCount()
+	return m.attach.InterfaceCount()
 }
 
 func (m *Manager) Snapshot() Snapshot {

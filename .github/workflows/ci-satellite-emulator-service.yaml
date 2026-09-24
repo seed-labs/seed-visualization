@@ -1,20 +1,20 @@
 name: CI Satellite Emulator Service
 
 on:
-  # pull_request:
-  #   branches:
-  #     - main
-  #   paths:
-  #     - "satellite-emulator-service/**"
-  #     - "docker-compose.yml"
-  #     - ".github/workflows/ci-satellite-emulator-service.yaml"
-  # push:
-  #   branches:
-  #     - main
-  #   paths:
-  #     - "satellite-emulator-service/**"
-  #     - "docker-compose.yml"
-  #     - ".github/workflows/ci-satellite-emulator-service.yaml"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "satellite-emulator-service/**"
+      - "docker-compose.yml"
+      - ".github/workflows/ci-satellite-emulator-service.yaml"
+  push:
+    branches:
+      - main
+    paths:
+      - "satellite-emulator-service/**"
+      - "docker-compose.yml"
+      - ".github/workflows/ci-satellite-emulator-service.yaml"
   workflow_call:
     inputs:
       run-static-checks:
@@ -94,7 +94,7 @@ jobs:
         run: npm run test:unit
 
       - name: Integration tests
-        if: ${{ github.event_name != 'workflow_dispatch' || inputs.run-integration-tests }}
+        if: ${{ env.LOCAL_CI_RUNNER == '1' }}
         env:
           TEST_COVERAGE_SCOPE: |
             - static satellite API: planned shell orbit data and Starlink gateway data responses.

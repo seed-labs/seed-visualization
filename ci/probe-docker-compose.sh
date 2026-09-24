@@ -49,7 +49,7 @@ cleanup() {
 trap cleanup EXIT
 
 echo "[ci] starting application lifecycle"
-compose up -d seedemu_emulator_service seedemu_satellite_emulator_service seedmu_traffic_observer_service seedemu_internet_map_toplogy seedemu_internet_map_geographic seedemu_internet_map_satellite
+compose up -d seedemu_emulator_service seedemu_satellite_emulator_service seedemu_traffic_observer_service seedemu_internet_map_toplogy seedemu_internet_map_geographic seedemu_internet_map_satellite
 
 retry_curl "emulator-service-env" "http://127.0.0.1:7071/api/v1/env.js" "window.__ENV__"
 retry_curl "satellite-service-orbits" "http://127.0.0.1:9091/api/v1/satellite/planned-shell-orbit" "\"ok\":true"

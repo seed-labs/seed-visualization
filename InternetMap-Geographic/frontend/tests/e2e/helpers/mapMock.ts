@@ -2,7 +2,10 @@ import type { Page } from '@playwright/test';
 import { mapContainersResponse, mapNetworksResponse } from '../fixtures/map';
 
 export async function mockInternetMapBackends(page: Page) {
+  await page.route('**/satellite-tiles/**', (route) => route.abort());
   await page.addInitScript(() => {
+    const trafficSockets: MockWebSocket[] = [];
+    Object.assign(window, { __mockTrafficSockets: trafficSockets });
     class MockWebSocket extends EventTarget {
       static CONNECTING = 0;
       static OPEN = 1;
@@ -18,6 +21,7 @@ export async function mockInternetMapBackends(page: Page) {
       constructor(url: string) {
         super();
         this.url = url;
+        trafficSockets.push(this);
         setTimeout(() => {
           const event = new Event('open');
           this.onopen?.(event);

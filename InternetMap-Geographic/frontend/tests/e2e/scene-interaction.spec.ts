@@ -5,10 +5,9 @@ test.use({ launchOptions: { args: ['--use-gl=angle', '--use-angle=swiftshader', 
 for (const mode of ['globe', '2d']) {
   test(`${mode}: highlights preserve geometry and camera interaction keeps links visible`, async ({ page }) => {
     await page.route('**/satellite-tiles/**', route => route.abort());
-    await page.goto('/dev/home');
+    await page.goto('/tests/e2e/scene-harness.html');
     const result = await page.evaluate(async mode => {
-      const moduleUrl = '/src/view/map/shared/services/cesiumScene.ts';
-      const { createMap3DScene } = await import(/* @vite-ignore */ moduleUrl);
+      const createMap3DScene = (window as any).createMap3DScene;
       const container = document.createElement('div');
       container.style.cssText = 'position:fixed;inset:0';
       document.body.appendChild(container);

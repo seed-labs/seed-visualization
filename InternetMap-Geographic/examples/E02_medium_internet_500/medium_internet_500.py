@@ -22,7 +22,7 @@ from seedemu.utilities import Makers
 from geopy.distance import geodesic
 
 # The supplied catalogue is named cityies.py, not cities.py.
-from cityies import IX_LOCATIONS
+from cities import IX_LOCATIONS
 
 META = 'org.seedsecuritylabs.seedemu.meta.'
 HOSTS_PER_STUB = 2

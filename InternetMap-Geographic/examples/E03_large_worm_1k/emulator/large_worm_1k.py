@@ -40,7 +40,7 @@ from seedemu.services import (
     DomainNameService,
 )
 
-from cityies import IX_LOCATIONS
+from cities import IX_LOCATIONS
 
 
 META = "org.seedsecuritylabs.seedemu.meta."

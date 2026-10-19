@@ -229,35 +229,28 @@ async function loadRuntimeInfo() {
 
   if (!node || !actionsAvailable.value) return
 
-  const tasks: Promise<void>[] = [
-    reqGetNetworkStatus(node.Id)
-      .then((response) => {
-        if (requestId === runtimeInfoRequestId) networkStatus.value = response.result
-      })
-      .catch(() => {
-        if (requestId === runtimeInfoRequestId) networkStatus.value = undefined
-      }),
-  ]
-
   if (showBgpSessions.value) {
     bgpLoading.value = true
-    tasks.push(
-      reqGetBgpPeers(node.Id)
-        .then((response) => {
-          if (requestId === runtimeInfoRequestId) bgpPeers.value = response.result || []
-        })
-        .catch(() => {
-          if (requestId === runtimeInfoRequestId) bgpError.value = 'Failed to load BGP sessions.'
-        })
-        .finally(() => {
-          if (requestId === runtimeInfoRequestId) bgpLoading.value = false
-        }),
-    )
+    try {
+      const response = await reqGetBgpPeers(node.Id)
+      if (requestId === runtimeInfoRequestId) bgpPeers.value = response.result || []
+    } catch {
+      if (requestId === runtimeInfoRequestId) bgpError.value = 'Failed to load BGP sessions.'
+    } finally {
+      if (requestId === runtimeInfoRequestId) bgpLoading.value = false
+    }
   } else {
     bgpLoading.value = false
   }
 
-  await Promise.allSettled(tasks)
+  if (requestId !== runtimeInfoRequestId) return
+
+  try {
+    const response = await reqGetNetworkStatus(node.Id)
+    if (requestId === runtimeInfoRequestId) networkStatus.value = response.result
+  } catch {
+    if (requestId === runtimeInfoRequestId) networkStatus.value = undefined
+  }
 }
 
 async function refreshRuntimeInfo() {

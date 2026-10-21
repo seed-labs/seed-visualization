@@ -55,6 +55,14 @@ docker compose up --build
 | Upload 2D | `http://localhost:8090/pro/upload/2d` |
 | Console | `http://localhost:8090/pro/console` |
 
+### Check the frontend after startup
+
+Open /pro/home on the configured host and port. The entry page should show the four topology cards:
+
+![Geographic home page after deployment](assets/current-home.png)
+
+The screenshot was captured from http://192.168.140.128:8096/pro/home; the URLs above use the default Compose port.
+
 ## Local development
 
 ```bash

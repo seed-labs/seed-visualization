@@ -14,6 +14,18 @@ Production examples:
 - `http://localhost:8090/pro/map/3d`
 - `http://localhost:8090/pro/map/2d`
 
+## Page screenshots
+
+The live 3D view shows the running topology and the Overview dock:
+
+![Live 3D topology with AS, IX, network, router, and host counts](assets/current-map-3d.png)
+
+The same running topology in the 2D view:
+
+![Live 2D topology and Overview dock](assets/current-map-2d.png)
+
+These captures reflect the deployed instance on 2026-10-20; background imagery was unavailable during capture. Nodes, links, and the dock are shown as rendered by the application.
+
 ## Rendered topology
 
 The live pages convert Docker API data into the following topology nodes:

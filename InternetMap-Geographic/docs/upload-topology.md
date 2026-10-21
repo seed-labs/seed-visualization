@@ -14,6 +14,18 @@ Production examples:
 - `http://localhost:8090/pro/upload/3d`
 - `http://localhost:8090/pro/upload/2d`
 
+## Upload page screenshots
+
+The 3D upload entry accepts an emulator-generated Compose file:
+
+![3D topology upload page with file drop zone and Parse file button](assets/current-upload-3d.png)
+
+The 2D upload entry provides the same workflow for a projected map:
+
+![2D topology upload page with file drop zone and Parse file button](assets/current-upload-2d.png)
+
+These entry-page screenshots were captured on 2026-10-20 before selecting a file. The examples below show the subsequent import and replay workflow.
+
 ## Uploading docker-compose.yml
 
 Workflow:

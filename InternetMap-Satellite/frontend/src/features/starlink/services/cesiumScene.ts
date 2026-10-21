@@ -156,9 +156,9 @@ type PickableNetworkNode = NetworkNodeLocation & {
 const STARLINK_TILE_URL = import.meta.env.VITE_SATELLITE_TILES_URL
   ?? 'https://satellitemap.space/tiles/styles/dark/512/{z}/{x}/{y}@2x.png';
 const STARLINK_TILE_CREDIT = 'satellitemap.space';
-const STARLINK_TILE_MINIMUM_LEVEL = 0;
+const STARLINK_TILE_MINIMUM_LEVEL = 2;
 const STARLINK_TILE_MAXIMUM_LEVEL = 7;
-const STARLINK_TILE_SIZE = 1024;
+const STARLINK_TILE_SIZE = 512;
 
 export function createCesiumScene(container: HTMLElement): CesiumSceneApi {
   const baseLayer = new ImageryLayer(
@@ -192,6 +192,8 @@ export function createCesiumScene(container: HTMLElement): CesiumSceneApi {
     navigationHelpButton: false,
     sceneMode: SceneMode.SCENE3D,
     shouldAnimate: true,
+    requestRenderMode: true,
+    maximumRenderTimeChange: Number.POSITIVE_INFINITY,
   });
 
   viewer.scene.globe.depthTestAgainstTerrain = false;
@@ -200,7 +202,7 @@ export function createCesiumScene(container: HTMLElement): CesiumSceneApi {
   viewer.scene.globe.material = undefined;
   viewer.scene.backgroundColor = Color.fromCssColorString('#020815');
   viewer.scene.globe.maximumScreenSpaceError = 1;
-  viewer.scene.globe.tileCacheSize = 700;
+  viewer.scene.globe.tileCacheSize = 500;
   viewer.scene.globe.atmosphereHueShift = 0;
   viewer.scene.globe.atmosphereSaturationShift = -0.15;
   viewer.scene.globe.atmosphereBrightnessShift = -0.34;
@@ -261,12 +263,15 @@ export function createCesiumScene(container: HTMLElement): CesiumSceneApi {
   let hoveredStationId: string | undefined;
   let hoveredContainerNodeId: string | undefined;
   const highlightTimerId = window.setInterval(() => {
+    let highlightUpdated = false;
     lastHighlightedIds.forEach((satelliteId) => {
       const point = pointBySatelliteId.get(satelliteId);
       if (point) {
         applyPointStyle(point, satelliteId, lastSelectedId, lastHighlightedIds);
+        highlightUpdated = true;
       }
     });
+    if (highlightUpdated) viewer.scene.requestRender();
   }, 180);
 
   function applyPointStyle(
@@ -755,6 +760,7 @@ export function createCesiumScene(container: HTMLElement): CesiumSceneApi {
     stationHoverHandler(station, station ? hoverAnchor : undefined);
     containerNodeHoverHandler(containerNode, containerNode ? hoverAnchor : undefined);
     container.style.cursor = nextHoveredSatelliteId || nextHoveredStationId || nextHoveredContainerNodeId ? 'pointer' : '';
+    viewer.scene.requestRender();
   }, ScreenSpaceEventType.MOUSE_MOVE);
 
   let selectHandler: RenderOptions['onSelect'] = () => undefined;
@@ -779,6 +785,7 @@ export function createCesiumScene(container: HTMLElement): CesiumSceneApi {
       lastSelectedId = options.selectedId;
       lastHighlightedIds = new Set(options.highlightedIds);
       renderSatellites(satellites, options);
+      viewer.scene.requestRender();
     },
     destroy() {
       window.clearInterval(highlightTimerId);

@@ -12,6 +12,8 @@ Path: `/home`
 
 The Home page is the entry page. It provides cards for the main topology views.
 
+![Home page with entry cards for live and uploaded 3D and 2D topology](assets/current-home.png)
+
 This project does not currently provide Dashboard or Plugin pages. Container, network, capture, and replay features are consolidated into the topology pages.
 
 ## Console

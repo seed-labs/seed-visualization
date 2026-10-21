@@ -31,6 +31,8 @@ Overview shows statistics for the currently rendered topology:
 - Routers
 - Hosts
 
+![Overview dock showing topology statistics and the node-type legend](assets/current-dock-overview.png)
+
 ### AS filtering
 
 Click the AS count card to open the AS selector.
@@ -64,6 +66,8 @@ Different node types are displayed with different shapes and colors on the map.
 ## Settings
 
 Settings controls search, visibility, scale, labels, and hover details.
+
+![Settings dock showing search, node visibility, scale, labels, and hover controls](assets/current-dock-settings.png)
 
 ### Search
 
@@ -132,6 +136,10 @@ On live topology pages, container-node details also provide runtime controls:
 ## Traffic Replay
 
 Traffic Replay uses the same control concepts on live and uploaded pages, but the data source is different.
+
+The live-page panel before starting capture or recording:
+
+![Traffic Replay dock with capture filter and playback controls](assets/current-dock-replay.png)
 
 ### Live pages
 

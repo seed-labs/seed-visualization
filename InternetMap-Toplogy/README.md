@@ -1,5 +1,7 @@
 # InternetMap
 
+For user-facing instructions, see the [English User Manual](../docs/user-manual/user-manual.md) and its [Topology guide](../docs/user-manual/topology/README.md).
+
 This is a visualization tool that we developed for the Internet emulator. 
 
 ## Features supported

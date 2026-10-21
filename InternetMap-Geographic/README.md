@@ -1,6 +1,20 @@
 # Internet Map Globe
 
+For user-facing instructions, start with the [English User Manual](../docs/user-manual/user-manual.md), then choose [Geographic 2D](../docs/user-manual/geographic-2d/README.md) or [Geographic 3D](../docs/user-manual/geographic-3d/README.md).
+
 `internet-map-globe` is a Cesium-based topology visualization frontend for SEED Emulator. It renders emulator containers, IX networks, regular networks, routers, hosts, and topology links on either a 3D globe or a 2D projected map. It also supports live packet-capture replay, offline collector JSON / PCAP replay, node search, node-type filtering, AS filtering, and IX filtering.
+
+## Page previews
+
+Home page with links to the live and uploaded 3D / 2D views:
+
+![Geographic home page and topology entry cards](docs/assets/current-home.png)
+
+Live 3D topology with the shared Overview dock:
+
+![Live geographic topology in 3D with node counts and legend](docs/assets/current-map-3d.png)
+
+Screenshots were captured from [the running Geographic instance](http://192.168.140.128:8096/pro/home) on 2026-10-20. Node counts depend on the running emulation. See the feature guides below for 2D views, upload pages, and dock controls.
 
 ## Feature overview
 

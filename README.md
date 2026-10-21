@@ -1,4 +1,8 @@
-﻿## Project layout
+﻿## User manual
+
+For browser-based workflows, see the [English Internet Map User Manual](docs/user-manual/README.md), covering [Geographic 2D](docs/user-manual/geographic-2d/README.md), [Geographic 3D](docs/user-manual/geographic-3d/README.md), and [Topology](docs/user-manual/topology/README.md).
+
+## Project layout
 
 - `emulator-service/`: shared API backend for emulator container, network, console, sniffer, packet, and plugin APIs.
 - `InternetMap-Toplogy/`: Internet Map frontend. Its container serves the frontend and proxies `/api/v1` to `emulator-service`.

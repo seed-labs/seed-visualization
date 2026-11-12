@@ -1,6 +1,6 @@
 ﻿## User manual
 
-For browser-based workflows, see the [English Internet Map User Manual](docs/user-manual/README.md), covering [Geographic 2D](docs/user-manual/geographic-2d/README.md), [Geographic 3D](docs/user-manual/geographic-3d/README.md), and [Topology](docs/user-manual/topology/README.md).
+For browser-based workflows, see the [English Internet Map User Manual](docs/user-manual/README.md), covering [Geographic 2D](docs/user-manual/geographic-2d/README.md), [Geographic 3D](docs/user-manual/geographic-3d/README.md), [Topology](docs/user-manual/topology/README.md), and [Satellite](docs/user-manual/satellite/README.md).
 
 ## Project layout
 

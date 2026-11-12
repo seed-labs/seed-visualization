@@ -11,8 +11,8 @@ import upload3D from '@/assets/img/upload-3d.png'
     <el-col>
       <section class="jumbotron text-center">
         <div class="container">
-          <h1>INTERNET MAP GLOBE</h1>
-          <p class="lead text-muted">This is a work-in-progress prototype of the internet-map-globe..</p>
+          <h1>INTERNET MAP GEOGRAPHIC</h1>
+          <p class="lead text-muted">This is a work-in-progress prototype of the internet-map-geographic..</p>
         </div>
       </section>
     </el-col>

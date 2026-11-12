@@ -113,7 +113,9 @@ export class SubmitEvent implements LogProducer {
         const tempDir = path.join(os.tmpdir(), 'submit-event');
         await fs.promises.mkdir(tempDir, {recursive: true});
         // read the file
-        const sourceFilePath = '../plugin/submit_event/submit_event.sh'
+        const sourceFilePath = path.join(
+            process.cwd(), 'plugin', 'submit_event', 'submit_event.sh'
+        );
         if (!fs.existsSync(sourceFilePath)) {
             this._logger.info(`File ${fs.realpathSync(sourceFilePath)} does not exist`);
             return

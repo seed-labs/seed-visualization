@@ -1,6 +1,6 @@
 # Dock, settings, and replay controls
 
-All 3D / 2D and live / uploaded topology pages in `internet-map-globe` share the bottom-right dock. The main component is:
+All 3D / 2D and live / uploaded topology pages in `internet-map-geographic` share the bottom-right dock. The main component is:
 
 ```text
 view/map/shared/components/EmulatorTopologyDock.vue

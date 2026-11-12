@@ -1,13 +1,14 @@
 import express from 'express';
-import {SocketHandler} from '../../utils/socket-handler';
-import {SeedContainerInfo, Emulator, SeedNetInfo} from '../../utils/seedemu-meta';
-import {Sniffer} from '../../utils/sniffer';
-import {SubmitEvent} from '../../utils/submit-event';
-import {PluginManager} from '../../utils/plugin-manager';
+import { SocketHandler } from '../../utils/socket-handler';
+import { SeedContainerInfo, Emulator, SeedNetInfo } from '../../utils/seedemu-meta';
+import { Sniffer } from '../../utils/sniffer';
+import { SubmitEvent } from '../../utils/submit-event';
+import { PluginManager } from '../../utils/plugin-manager';
 import WebSocket from 'ws';
-import {Controller} from '../../utils/controller';
-import {createRuntimeClient} from '../../runtime';
-import {RuntimeNetwork, RuntimeNode} from '../../runtime/types';
+import { Controller } from '../../utils/controller';
+import { createRuntimeClient } from '../../runtime';
+import { RuntimeNetwork, RuntimeNode } from '../../runtime/types';
+import { execFileSync } from 'child_process'
 
 let snifferSubscribers: WebSocket[] = [];
 let currentSnifferFilter: string = '';
@@ -46,6 +47,22 @@ function toNetworkInfo(network: RuntimeNetwork): SeedNetInfo {
         Name: raw.Name || network.name,
         Labels: raw.Labels || network.labels
     } as SeedNetInfo;
+}
+
+function getDefaultRouteIP(): string {
+    const output = execFileSync(
+        'ip',
+        ['-4', 'route', 'get', '1.1.1.1'],
+        { encoding: 'utf8' }
+    )
+
+    const match = output.match(/\bsrc\s+(\d{1,3}(?:\.\d{1,3}){3})\b/)
+
+    if (!match) {
+        throw new Error(`Cannot determine route source IP: ${output}`)
+    }
+
+    return match[1]
 }
 
 const getContainers: () => Promise<SeedContainerInfo[]> = async function () {
@@ -117,7 +134,7 @@ router.get('/install', async function (req, res, next) {
 });
 router.post('/install', express.json(), async function (req, res, next) {
     const plugin = req.body.name
-    const address = `${req.socket.localAddress}:${req.socket.localPort}`
+    const address = `${getDefaultRouteIP()}:${req.socket.localPort}`
     let ret = await submitEvent.submitEvent(address, (await getContainers()).map(c => c.Id), 'install', plugin);
     if (ret) {
         ret = {
@@ -229,21 +246,24 @@ router.post('/container/vis/set', express.json(), async function (req, res, next
     }
     let option = {
         id: candidates[0].Id,
-        static: {borderWidth: 1, size: 25},
-        dynamic: {borderWidth: 4, size: 25},
+        static: { borderWidth: 1, size: 25 },
+        dynamic: { borderWidth: 4, size: 25 },
         action
     }
     switch (action) {
         case 'flash':
         case 'flashOnce':
-            option = {...option, ...req.body['flash']};
+            option = { ...option, ...(req.body?.flash ?? {}) };
             break
         case 'highlight':
-            option.static = (!req.body['highlight'] || Object.keys(req.body['highlight']).length === 0) ? {borderWidth: 4} : req.body['highlight'];
+            const highlight = req.body?.highlight;
+            option.static = !highlight || Object.keys(highlight).length === 0
+                ? { borderWidth: 4 }
+                : highlight;
             break
         default:
-            option.static = {borderWidth: 1, size: 25};
-            option.dynamic = {borderWidth: 4, size: 25};
+            option.static = { borderWidth: 1, size: 25 };
+            option.dynamic = { borderWidth: 4, size: 25 };
             break
     }
 

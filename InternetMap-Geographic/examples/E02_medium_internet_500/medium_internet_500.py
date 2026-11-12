@@ -482,7 +482,7 @@ def main():
         emu.render()
     output = Path(args.output).resolve()
     output.parent.mkdir(parents=True, exist_ok=True)
-    emu.compile(GeoDocker(internetMapEnabled=False, platform=Platform.AMD64 if args.platform == 'amd' else Platform.ARM64),
+    emu.compile(GeoDocker(platform=Platform.AMD64 if args.platform == 'amd' else Platform.ARM64),
                 str(output), override=args.override)
     remove_build_helpers(output)
     validate_compose(output, args.nodes)

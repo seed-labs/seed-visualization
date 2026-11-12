@@ -612,11 +612,13 @@ defineExpose({mapUi})
             :key="_key"
             :label="_key">
           <template v-if="Array.isArray(value)">
-            {{ value[0] }}
-            <span v-html="value[1]"/>
+            <span class="node-detail-value">
+              {{ value[0] }}
+              <span v-html="value[1]"/>
+            </span>
           </template>
           <template v-else>
-            {{ value }}
+            <span class="node-detail-value">{{ value }}</span>
           </template>
         </el-descriptions-item>
       </template>
@@ -631,6 +633,19 @@ defineExpose({mapUi})
 .el-slider {
   margin-left: 10px;
   width: 95%;
+}
+
+:deep(.node-detail-value) {
+  display: inline-block;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+:deep(.el-descriptions__title) {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 </style>
 

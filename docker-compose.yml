@@ -97,8 +97,6 @@
     volumes:
       - /sys/kernel/debug:/sys/kernel/debug
       - /sys/fs/bpf:/sys/fs/bpf
-      - /sys/kernel/btf:/sys/kernel/btf:ro
-      - /lib/modules:/lib/modules:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - ./traffic-observer-service/pcap:/data/pcap
     restart: unless-stopped

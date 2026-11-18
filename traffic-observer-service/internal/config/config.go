@@ -7,30 +7,32 @@ import (
 )
 
 type Config struct {
-	ObjectPath           string
-	FilterExpr           string
-	ControlAddr          string
-	DockerSocket         string
-	OnlySeedContainers   bool
-	DiscoveryConcurrency int
-	Interfaces           []string
-	WebSocketSinkURL     string
-	PcapOutputDir        string
-	PcapEnabled          bool
+	ObjectPath             string
+	FilterExpr             string
+	ControlAddr            string
+	DockerSocket           string
+	OnlySeedContainers     bool
+	DiscoveryConcurrency   int
+	ExpectedInterfaceCount int
+	Interfaces             []string
+	WebSocketSinkURL       string
+	PcapOutputDir          string
+	PcapEnabled            bool
 }
 
 func Load() Config {
 	return Config{
-		ObjectPath:           env("EBPF_OBJECT", "/tmp/packet_trace.bpf.o"),
-		FilterExpr:           env("TRAFFIC_FILTER", ""),
-		ControlAddr:          env("TRAFFIC_CONTROL_ADDR", ":10011"),
-		DockerSocket:         env("DOCKER_SOCKET_PATH", "/var/run/docker.sock"),
-		OnlySeedContainers:   envBool("TRAFFIC_ONLY_SEED_CONTAINERS", true),
-		DiscoveryConcurrency: envInt("TRAFFIC_DISCOVERY_CONCURRENCY", 32),
-		Interfaces:           splitCSV(env("TRAFFIC_INTERFACES", "")),
-		WebSocketSinkURL:     strings.TrimSpace(os.Getenv("EMULATOR_SERVICE_TRAFFIC_URL")),
-		PcapOutputDir:        env("TRAFFIC_PCAP_OUTPUT_DIR", "pcap"),
-		PcapEnabled:          envBool("TRAFFIC_PCAP_ENABLED", false),
+		ObjectPath:             env("EBPF_OBJECT", "/tmp/packet_trace.bpf.o"),
+		FilterExpr:             env("TRAFFIC_FILTER", ""),
+		ControlAddr:            env("TRAFFIC_CONTROL_ADDR", ":10011"),
+		DockerSocket:           env("DOCKER_SOCKET_PATH", "/var/run/docker.sock"),
+		OnlySeedContainers:     envBool("TRAFFIC_ONLY_SEED_CONTAINERS", true),
+		DiscoveryConcurrency:   envInt("TRAFFIC_DISCOVERY_CONCURRENCY", 32),
+		ExpectedInterfaceCount: envInt("TRAFFIC_EXPECTED_INTERFACE_COUNT", 1),
+		Interfaces:             splitCSV(env("TRAFFIC_INTERFACES", "")),
+		WebSocketSinkURL:       strings.TrimSpace(os.Getenv("EMULATOR_SERVICE_TRAFFIC_URL")),
+		PcapOutputDir:          env("TRAFFIC_PCAP_OUTPUT_DIR", "pcap"),
+		PcapEnabled:            envBool("TRAFFIC_PCAP_ENABLED", false),
 	}
 }
 

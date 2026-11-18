@@ -12,10 +12,11 @@ import (
 )
 
 type Manager struct {
-	mu           sync.RWMutex
-	dockerSocket string
-	options      dockeriface.DiscoverOptions
-	attach       interface {
+	mu                     sync.RWMutex
+	dockerSocket           string
+	options                dockeriface.DiscoverOptions
+	expectedInterfaceCount int
+	attach                 interface {
 		ReplaceInterfaces([]string) error
 		InterfaceNames() []string
 		InterfaceCount() int
@@ -32,14 +33,15 @@ type Snapshot struct {
 	DiscoveredContainerInterface int    `json:"discoveredContainerInterfaces"`
 }
 
-func New(dockerSocket string, options dockeriface.DiscoverOptions, packetProbe *probe.Probe) *Manager {
+func New(dockerSocket string, options dockeriface.DiscoverOptions, expectedInterfaceCount int, packetProbe *probe.Probe) *Manager {
 	return &Manager{
-		dockerSocket:   dockerSocket,
-		options:        options,
-		attach:         packetProbe,
-		discover:       dockeriface.Discover,
-		containerIndex: dockeriface.NewIndex(nil),
-		interfaceNames: packetProbe.InterfaceNames(),
+		dockerSocket:           dockerSocket,
+		options:                options,
+		expectedInterfaceCount: expectedInterfaceCount,
+		attach:                 packetProbe,
+		discover:               dockeriface.Discover,
+		containerIndex:         dockeriface.NewIndex(nil),
+		interfaceNames:         packetProbe.InterfaceNames(),
 	}
 }
 
@@ -55,7 +57,7 @@ func (m *Manager) SetExplicitInterfaces(names []string) error {
 }
 
 func (m *Manager) EnsureReady(ctx context.Context) (Snapshot, error) {
-	if m.AttachedInterfaceCount() > 0 {
+	if m.AttachedInterfaceCount() >= m.expectedInterfaceCount {
 		return m.Snapshot(), nil
 	}
 
@@ -63,8 +65,8 @@ func (m *Manager) EnsureReady(ctx context.Context) (Snapshot, error) {
 	if err != nil {
 		return snapshot, err
 	}
-	if snapshot.Interfaces == "" {
-		return snapshot, fmt.Errorf("no emulator container interfaces discovered")
+	if m.AttachedInterfaceCount() < m.expectedInterfaceCount {
+		return snapshot, fmt.Errorf("discovered %d attached interfaces; expected at least %d", m.AttachedInterfaceCount(), m.expectedInterfaceCount)
 	}
 	return snapshot, nil
 }

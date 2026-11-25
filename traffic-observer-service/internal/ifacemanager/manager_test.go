@@ -17,12 +17,15 @@ type fakeAttacher struct {
 	calls int
 }
 
-func (f *fakeAttacher) ReplaceInterfaces(names []string) error {
+func (f *fakeAttacher) ReplaceInterfaces(targets map[string]int) error {
 	f.calls++
 	if f.err != nil {
 		return f.err
 	}
-	f.names = append([]string(nil), names...)
+	f.names = make([]string, 0, len(targets))
+	for name := range targets {
+		f.names = append(f.names, name)
+	}
 	return nil
 }
 func (f *fakeAttacher) InterfaceNames() []string { return append([]string(nil), f.names...) }

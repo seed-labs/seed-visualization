@@ -264,10 +264,10 @@ Example response:
 }
 ```
 
-The root `docker-compose.yml` mounts the output directory by default:
+The default output directory is inside the container and is not bind-mounted to the host. PCAP and JSON files are therefore container-local and may be lost when the container is removed or recreated.
 
 ```text
-./traffic-observer-service/pcap:/data/pcap
+/data/pcap
 ```
 
 ## Logging timezone

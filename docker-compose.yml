@@ -85,9 +85,9 @@
     network_mode: host
     environment:
       TRAFFIC_INTERFACES: ${TRAFFIC_INTERFACES:-}
-      TRAFFIC_FALLBACK_INTERFACES: ${TRAFFIC_FALLBACK_INTERFACES:-docker0}
       TRAFFIC_ONLY_SEED_CONTAINERS: ${TRAFFIC_ONLY_SEED_CONTAINERS:-true}
       TRAFFIC_DISCOVERY_CONCURRENCY: ${TRAFFIC_DISCOVERY_CONCURRENCY:-32}
+      TRAFFIC_EXPECTED_INTERFACE_COUNT: ${TRAFFIC_EXPECTED_INTERFACE_COUNT:-1}
       TRAFFIC_FILTER: ${TRAFFIC_FILTER:-}
       TRAFFIC_CONTROL_ADDR: ${TRAFFIC_CONTROL_ADDR:-:19092}
       EMULATOR_SERVICE_TRAFFIC_URL: ${EMULATOR_SERVICE_TRAFFIC_URL:-}
@@ -98,7 +98,6 @@
       - /sys/kernel/debug:/sys/kernel/debug
       - /sys/fs/bpf:/sys/fs/bpf
       - /var/run/docker.sock:/var/run/docker.sock:ro
-      - ./traffic-observer-service/pcap:/data/pcap
     restart: unless-stopped
     # profiles:
     #   - observer

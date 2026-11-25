@@ -17,7 +17,7 @@ type Manager struct {
 	options                dockeriface.DiscoverOptions
 	expectedInterfaceCount int
 	attach                 interface {
-		ReplaceInterfaces([]string) error
+		ReplaceInterfaces(map[string]int) error
 		InterfaceNames() []string
 		InterfaceCount() int
 	}
@@ -46,7 +46,11 @@ func New(dockerSocket string, options dockeriface.DiscoverOptions, expectedInter
 }
 
 func (m *Manager) SetExplicitInterfaces(names []string) error {
-	if err := m.attach.ReplaceInterfaces(names); err != nil {
+	targets, err := probe.ResolveInterfaceNames(names)
+	if err != nil {
+		return err
+	}
+	if err := m.attach.ReplaceInterfaces(targets); err != nil {
 		return err
 	}
 
@@ -78,8 +82,13 @@ func (m *Manager) Refresh(ctx context.Context) (Snapshot, error) {
 	}
 
 	containerIndex := dockeriface.NewIndex(containerInterfaces)
-	interfaceNames := containerIndex.HostInterfaceNames()
-	if err := m.attach.ReplaceInterfaces(interfaceNames); err != nil {
+	targets := make(map[string]int, len(containerIndex.ByHostIfName))
+	for name, iface := range containerIndex.ByHostIfName {
+		if name != "" {
+			targets[name] = iface.HostIfIndex
+		}
+	}
+	if err := m.attach.ReplaceInterfaces(targets); err != nil {
 		return m.Snapshot(), err
 	}
 

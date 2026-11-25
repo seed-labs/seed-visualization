@@ -9,7 +9,6 @@ volumes:
   - /sys/kernel/debug:/sys/kernel/debug
   - /sys/fs/bpf:/sys/fs/bpf
   - /var/run/docker.sock:/var/run/docker.sock:ro
-  - ./traffic-observer-service/pcap:/data/pcap
 ```
 
 Whether these host paths exist depends on the Linux host running the Docker daemon, its kernel and filesystem mounts, and its Docker configuration. Different Ubuntu 24 point releases or kernel configurations may result in some paths being absent. For example, an older Compose configuration may also include `/sys/kernel/btf:/sys/kernel/btf:ro`. If `/sys/kernel/btf` is absent on the host, Docker may report:
@@ -29,7 +28,7 @@ mountpoint /sys/kernel/debug
 mountpoint /sys/fs/bpf
 ```
 
-Enable the appropriate debugfs and BPF filesystems for your host before starting the service. With Docker Desktop, a remote Docker daemon, or a restricted container environment, also confirm that the daemon can access and bind these host paths. `/var/run/docker.sock` must point to an available Docker socket. `./traffic-observer-service/pcap` is the recording directory relative to the Compose project directory; run Compose from the project root and ensure the Docker daemon can access that directory.
+Enable the appropriate debugfs and BPF filesystems for your host before starting the service. With Docker Desktop, a remote Docker daemon, or a restricted container environment, also confirm that the daemon can access and bind these host paths. `/var/run/docker.sock` must point to an available Docker socket. PCAP and JSON recording files are stored inside the container at `/data/pcap` and are not persisted to a host directory; they may be lost when the container is removed or recreated.
 
 After changing the mounts, recreate the observer container to apply the changes:
 

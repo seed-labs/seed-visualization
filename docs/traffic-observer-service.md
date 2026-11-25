@@ -220,7 +220,7 @@ The default is `Asia/Shanghai`. If the time zone cannot be loaded, the service f
 - Runtime settings: `privileged: true`, `pid: host`, and `network_mode: host`
 - Because the service uses host networking, the Go server listening on `:19092` is exposed directly on host port `19092`. Do not add a Compose `ports` mapping.
 - Default PCAP / JSON output directory: `/data/pcap`
-- Default host mount: `./traffic-observer-service/pcap:/data/pcap`
+- PCAP / JSON output is stored only in the container filesystem; it is not persisted to a host directory. Files may be lost when the container is removed or recreated.
 
 Common environment variables:
 

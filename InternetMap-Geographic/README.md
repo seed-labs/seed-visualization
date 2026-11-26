@@ -1,8 +1,8 @@
-# Internet Map Globe
+# Internet Map Geographic
 
 For user-facing instructions, start with the [English User Manual](../docs/user-manual/user-manual.md), then choose [Geographic 2D](../docs/user-manual/geographic-2d/README.md) or [Geographic 3D](../docs/user-manual/geographic-3d/README.md).
 
-`internet-map-globe` is a Cesium-based topology visualization frontend for SEED Emulator. It renders emulator containers, IX networks, regular networks, routers, hosts, and topology links on either a 3D globe or a 2D projected map. It also supports live packet-capture replay, offline collector JSON / PCAP replay, node search, node-type filtering, AS filtering, and IX filtering.
+`internet-map-geographic` is a Cesium-based topology visualization frontend for SEED Emulator. It renders emulator containers, IX networks, regular networks, routers, hosts, and topology links on either a 3D globe or a 2D projected map. It also supports live packet-capture replay, offline collector JSON / PCAP replay, node search, node-type filtering, AS filtering, and IX filtering.
 
 ## Page previews
 

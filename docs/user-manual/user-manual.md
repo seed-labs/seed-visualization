@@ -17,3 +17,9 @@
 [InternetMap-Toplogy](topology/README.md) presents an emulated network as a connectivity diagram. It helps you understand relationships between hosts, routers, Internet exchanges, and transit networks. You can explore different levels of detail, search for nodes, inspect live packet activity, or upload a saved topology for offline viewing.
 
 ![InternetMap-Toplogy network diagram](../../InternetMap-Toplogy/docs/assets/map.png)
+
+## InternetMap-Satellite
+
+[InternetMap-Satellite](satellite/README.md) displays satellite orbits, ground
+stations, and network links on a 3D globe. The guide covers simulation time,
+filters, object details, timeline events, and live or offline traffic replay.

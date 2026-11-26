@@ -112,6 +112,7 @@ Useful environment overrides:
 ```bash
 TRAFFIC_INTERFACES=
 TRAFFIC_ONLY_SEED_CONTAINERS=true
+TRAFFIC_EXPECTED_INTERFACE_COUNT=1
 TRAFFIC_FILTER=""
 TRAFFIC_CONTROL_ADDR=":19092"
 EMULATOR_SERVICE_TRAFFIC_URL="ws://127.0.0.1:7071/api/v1/traffic/stream"
@@ -126,7 +127,7 @@ If `TRAFFIC_INTERFACES` is empty, the collector tries to discover container inte
 Docker API -> container PID -> container netns ethX iflink -> host /sys/class/net/*/ifindex -> host veth
 ```
 
-If no container veth is discovered at startup, the observer still starts the control server, WebSocket endpoint, pcap control, and ring-buffer reader without attaching to any host interface. It does not fall back to `docker0`. A non-empty `/filter` update will retry interface discovery before enabling capture. If discovery still finds no interfaces, the filter request returns an error.
+If no container veth is discovered at startup, the observer still starts the control server, WebSocket endpoint, pcap control, and ring-buffer reader without attaching to any host interface. It does not fall back to `docker0`. Before applying a non-empty `/filter`, the observer compares its attached interface count with `TRAFFIC_EXPECTED_INTERFACE_COUNT`. If the count is lower, it rediscovers interfaces through Docker and reattaches the eBPF programs. If the count is still lower after discovery, the request returns `503 Service Unavailable` and does not apply the filter.
 
 Use `TRAFFIC_INTERFACES` only when you intentionally want to attach to explicit host interfaces. When it is empty, capture is limited to discovered SEED emulator container veth interfaces.
 
@@ -142,7 +143,7 @@ curl -X PUT http://127.0.0.1:19092/filter \
   -d '{"filter":"tcp and port 80"}'
 ```
 
-When the filter value is non-empty, the observer first checks whether it has attached interfaces. If the current interface set is empty, it performs one Docker-based interface refresh, updates the eBPF attach points, and then applies the filter. If no interfaces are found after that refresh, the request fails with `503 Service Unavailable`.
+When the filter value is non-empty, the observer checks whether the attached interface count meets `TRAFFIC_EXPECTED_INTERFACE_COUNT`. If it does not, the observer performs one Docker-based discovery and reattaches the discovered interfaces. The filter is applied only if the refreshed count meets the expected count; otherwise the request returns `503 Service Unavailable` and leaves the filter unchanged. The default expected count is `1`.
 
 Get the current filter:
 
@@ -227,7 +228,7 @@ Important behavior:
 
 - Startup discovery runs once.
 - The observer does not continuously poll Docker API in the background.
-- A non-empty `/filter` request retries discovery only when the current attached interface set is empty.
+- A non-empty `/filter` request retries discovery when the current attached interface count is below `TRAFFIC_EXPECTED_INTERFACE_COUNT`.
 - If Docker API data changes while the observer already has non-empty interface data, call `/interfaces` or restart the service; do not rely on `/filter` to refresh a stale non-empty mapping.
 
 Recommended operational flow when emulator topology changes:
@@ -263,10 +264,10 @@ Example response:
 }
 ```
 
-The root `docker-compose.yml` mounts the output directory by default:
+The default output directory is inside the container and is not bind-mounted to the host. PCAP and JSON files are therefore container-local and may be lost when the container is removed or recreated.
 
 ```text
-./traffic-observer-service/pcap:/data/pcap
+/data/pcap
 ```
 
 ## Logging timezone

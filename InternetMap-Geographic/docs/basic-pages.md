@@ -1,6 +1,6 @@
 # Basic pages
 
-Besides the topology pages, `internet-map-globe` keeps a small set of basic pages:
+Besides the topology pages, `internet-map-geographic` keeps a small set of basic pages:
 
 - Home
 - Console

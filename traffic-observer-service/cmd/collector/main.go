@@ -67,7 +67,7 @@ func run() error {
 	interfaceManager := ifacemanager.New(cfg.DockerSocket, dockeriface.DiscoverOptions{
 		OnlySeedContainers: cfg.OnlySeedContainers,
 		MaxConcurrency:     cfg.DiscoveryConcurrency,
-	}, packetProbe)
+	}, cfg.ExpectedInterfaceCount, packetProbe)
 	if len(cfg.Interfaces) > 0 {
 		if err := interfaceManager.SetExplicitInterfaces(cfg.Interfaces); err != nil {
 			return err

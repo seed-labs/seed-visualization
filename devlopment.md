@@ -8,7 +8,7 @@
 
 ### 计划
 
-## Internet Map Globe
+## Internet Map Geographic
 
 ### 已实现
 

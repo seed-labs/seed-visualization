@@ -1251,7 +1251,6 @@ def main():
 
     docker = GeoDocker(
         anchors=anchors,
-        internetMapEnabled=False,
         platform=platform,
     )
 

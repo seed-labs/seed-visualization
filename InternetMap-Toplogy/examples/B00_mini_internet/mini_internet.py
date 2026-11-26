@@ -13,7 +13,7 @@ REPO_ROOT = SCRIPT_DIR.parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from seedemu.compiler import VisualizationDocker, Platform
+from seedemu.compiler import Docker, Platform
 from seedemu.core import Emulator
 from seedemu.layers import Base, Ebgp, Ibgp, Ospf, PeerRelationship, Routing
 from seedemu.utilities import Makers
@@ -172,7 +172,7 @@ def run(
     if render:
         emu.render()
 
-    docker = VisualizationDocker(platform=platform)
+    docker = Docker(platform=platform)
     emu.compile(docker, output or "./output", override=override)
 
 

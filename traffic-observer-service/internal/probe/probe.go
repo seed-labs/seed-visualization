@@ -3,6 +3,7 @@ package probe
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"net"
 	"strings"
 	"sync"
@@ -20,6 +21,7 @@ type Probe struct {
 	filterMap  *ebpf.Map
 	links      []link.Link
 	interfaces []string
+	ifIndexes  map[string]int
 }
 
 func Open(objectPath string, interfaces []string) (*Probe, error) {
@@ -54,7 +56,11 @@ func Open(objectPath string, interfaces []string) (*Probe, error) {
 		reader:     reader,
 		filterMap:  filterMap,
 	}
-	if err := probe.ReplaceInterfaces(interfaces); err != nil {
+	targets, err := ResolveInterfaceNames(interfaces)
+	if err == nil {
+		err = probe.ReplaceInterfaces(targets)
+	}
+	if err != nil {
 		probe.Close()
 		return nil, err
 	}
@@ -85,29 +91,30 @@ func (p *Probe) Close() error {
 	return closeErr
 }
 
-func (p *Probe) ReplaceInterfaces(names []string) error {
-	names = uniqueInterfaceNames(names)
-
+func (p *Probe) ReplaceInterfaces(targets map[string]int) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	if sameInterfaceSet(p.interfaces, names) {
-		p.interfaces = names
+	if maps.Equal(p.ifIndexes, targets) {
 		return nil
 	}
 
 	closeErr := closeLinks(p.links)
 	p.links = nil
 	p.interfaces = nil
+	p.ifIndexes = nil
 
-	links, err := attachPrograms(p.collection, names)
+	links, err := attachPrograms(p.collection, targets)
 	if err != nil {
 		closeLinks(links)
 		return err
 	}
 
 	p.links = links
-	p.interfaces = names
+	p.ifIndexes = maps.Clone(targets)
+	for name := range targets {
+		p.interfaces = append(p.interfaces, name)
+	}
 	return closeErr
 }
 
@@ -148,23 +155,17 @@ func findFilterMap(collection *ebpf.Collection) (*ebpf.Map, error) {
 	return nil, fmt.Errorf("filter map not found; tried=%s available_maps=%s; recompile EBPF_OBJECT after changing packet_trace.bpf.c", strings.Join(candidates, ","), strings.Join(available, ","))
 }
 
-func attachPrograms(collection *ebpf.Collection, names []string) ([]link.Link, error) {
+func attachPrograms(collection *ebpf.Collection, targets map[string]int) ([]link.Link, error) {
 	ingress := collection.Programs["trace_ingress"]
 	if ingress == nil {
 		return nil, fmt.Errorf("trace_ingress program not found")
 	}
 
-	var attached []link.Link
-	for _, name := range names {
-		iface, err := net.InterfaceByName(name)
-		if err != nil {
-			closeLinks(attached)
-			return nil, fmt.Errorf("find interface %q: %w", name, err)
-		}
-
+	attached := make([]link.Link, 0, len(targets))
+	for name, index := range targets {
 		in, err := link.AttachTCX(link.TCXOptions{
 			Program:   ingress,
-			Interface: iface.Index,
+			Interface: index,
 			Attach:    ebpf.AttachTCXIngress,
 		})
 		if err != nil {
@@ -194,21 +195,28 @@ func uniqueInterfaceNames(names []string) []string {
 	return out
 }
 
-func sameInterfaceSet(left []string, right []string) bool {
-	if len(left) != len(right) {
-		return false
+func ResolveInterfaceNames(names []string) (map[string]int, error) {
+	names = uniqueInterfaceNames(names)
+	if len(names) == 0 {
+		return nil, nil
 	}
-	counts := map[string]int{}
-	for _, name := range left {
-		counts[name]++
+	interfaces, err := net.Interfaces()
+	if err != nil {
+		return nil, fmt.Errorf("list host interfaces: %w", err)
 	}
-	for _, name := range right {
-		counts[name]--
-		if counts[name] < 0 {
-			return false
+	byName := make(map[string]int, len(interfaces))
+	for _, iface := range interfaces {
+		byName[iface.Name] = iface.Index
+	}
+	targets := make(map[string]int, len(names))
+	for _, name := range names {
+		index, ok := byName[name]
+		if !ok {
+			return nil, fmt.Errorf("host interface %q not found", name)
 		}
+		targets[name] = index
 	}
-	return true
+	return targets, nil
 }
 
 func closeLinks(links []link.Link) error {

@@ -1,10 +1,10 @@
 # Deployment and environment variables
 
-This document describes how to start `internet-map-globe` with Docker Compose, how to run it locally for development, and which environment variables matter most.
+This document describes how to start `internet-map-geographic` with Docker Compose, how to run it locally for development, and which environment variables matter most.
 
 ## Docker Compose service
 
-In the repository-level `docker-compose.yml`, the service key for `internet-map-globe` is:
+In the repository-level `docker-compose.yml`, the service key for `internet-map-geographic` is:
 
 ```text
 seedemu_internet_map_geographic
